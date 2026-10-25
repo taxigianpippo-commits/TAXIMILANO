@@ -106,15 +106,23 @@
                     fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
                         .then(response => response.json())
                         .then(data => {
+                            let via = "";
                             if (data && data.address) {
-                                // Estraiamo SOLO la strada (ignorando civico, cap, ecc.)
-                                const via = data.address.road || data.address.pedestrian || data.address.street || "Via non trovata";
-                                
-                                box.innerText = "Via: " + via;
-                                input.value = via;
-                            } else {
-                                box.innerText = "Indirizzo non trovato";
+                                via = data.address.road || data.address.pedestrian || data.address.street || "";
                             }
+                            if (!via && data && data.display_name) {
+                                via = data.display_name.split(',')[0];
+                            }
+                            
+                            // Rimuove tutti i numeri lasciando solo il nome della via pulito
+                            via = via.replace(/[0-9]/g, '').trim();
+                            
+                            if (!via) {
+                                via = "Via non trovata";
+                            }
+                            
+                            box.innerText = "Via: " + via;
+                            input.value = via;
                         })
                         .catch(error => {
                             console.error(error);
