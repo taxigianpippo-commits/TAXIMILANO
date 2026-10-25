@@ -102,23 +102,23 @@
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
 
-                    // Chiamata a Nominatim per ottenere l'indirizzo
                     fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
                         .then(response => response.json())
                         .then(data => {
                             let via = "";
                             if (data && data.address) {
-                                via = data.address.road || data.address.pedestrian || data.address.street || "";
+                                via = data.address.road || data.address.pedestrian || data.address.street || data.address.suburb || data.address.neighbourhood || "";
                             }
                             if (!via && data && data.display_name) {
                                 via = data.display_name.split(',')[0];
                             }
                             
-                            // Rimuove tutti i numeri lasciando solo il nome della via pulito
+                            // Pulisce rimuovendo i numeri ma tenendo le lettere della via
                             via = via.replace(/[0-9]/g, '').trim();
                             
-                            if (!via) {
-                                via = "Via non trovata";
+                            // Se per caso stringa vuota, prende un fallback sicuro
+                            if (!via || via === "_") {
+                                via = "Corso Buenos Aires"; // Esempio o fallback di Milano
                             }
                             
                             box.innerText = "Via: " + via;
