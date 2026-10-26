@@ -4,1452 +4,190 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Taxi Milano</title>
+    <title>Taxi Milano Pro</title>
+    <!-- Chart.js & SheetJS -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         :root {
-            --bg-dark: #0f172a;
-            --card-dark: #1e293b;
+            --bg-body: #090d16;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --bg-card-solid: #1e293b;
+            --border-card: rgba(255, 255, 255, 0.08);
             --text-main: #f8fafc;
             --text-muted: #94a3b8;
-            --accent: #3b82f6;
-            --accent-hover: #1d4ed8;
+            --accent-primary: #3b82f6;
+            --accent-glow: rgba(59, 130, 246, 0.25);
             --success: #10b981;
+            --success-glow: rgba(16, 185, 129, 0.2);
             --danger: #ef4444;
             --warning: #f59e0b;
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --radius-sm: 10px;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            background-color: var(--bg-dark);
+            background-color: var(--bg-body);
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            background-image: radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.12), transparent 40%);
         }
 
         header {
-            background-color: var(--card-dark);
-            padding: 1rem;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 1.2rem 1rem;
             text-align: center;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid var(--border-card);
             position: sticky;
             top: 0;
             z-index: 10;
         }
 
-        h1 {
-            font-size: 1.5rem;
+        header h1 {
+            font-size: 1.4rem;
             font-weight: 700;
-            color: var(--accent);
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
         }
 
         main {
             flex: 1;
             padding: 1rem;
-            max-width: 600px;
+            max-width: 500px;
             margin: 0 auto;
             width: 100%;
         }
 
-        .btn {
-            background-color: var(--accent);
-            color: var(--text-main);
-            border: none;
-            padding: 1rem;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            width: 100%;
-            cursor: pointer;
-            transition: background-color 0.2s;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn:active {
-            transform: scale(0.98);
-        }
-
-        .btn:hover {
-            background-color: var(--accent-hover);
-        }
-
-        .btn-secondary {
-            background-color: var(--card-dark);
-            border: 1px solid var(--text-muted);
-            color: var(--text-main);
-            margin-top: 1rem;
-        }
-
-        .card {
-            background-color: var(--card-dark);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
-        }
-
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.85);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 100;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s, visibility 0.3s;
-            padding: 1rem;
-        }
-
-        .modal-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-
-        .modal-content {
-            background-color: var(--card-dark);
-            width: 100%;
-            max-width: 500px;
-            border-radius: 20px;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-            transform: scale(0.95);
-            transition: transform 0.3s;
-            text-align: center;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal-overlay.active .modal-content {
-            transform: scale(1);
-        }
-
-        .modal-title {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: var(--text-main);
-        }
-
-        .input-group {
-            display: flex;
-            gap: 0.5rem;
-            align-items: center;
-        }
-
-        input[type="text"],
-        input[type="number"] {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
-            border: 1px solid #334155;
-            padding: 1rem;
-            border-radius: 12px;
-            font-size: 1.1rem;
-            flex: 1;
-            width: 100%;
-            text-align: center;
-        }
-        
-        #gps-result {
-            margin-top: 1rem;
-            padding: 1rem;
-            background-color: var(--bg-dark);
-            border-radius: 12px;
-            border: 1px solid var(--success);
-            color: var(--success);
-            font-weight: 600;
-            font-size: 1.1rem;
-            width: 100%;
-            display: none;
-        }
-
-        .action-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 1rem;
-        }
-
-        .btn-large {
-            padding: 1.5rem;
-            font-size: 1.2rem;
-        }
-
-        .rides-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-
-        .ride-item {
-            background-color: var(--card-dark);
-            border-radius: 12px;
-            padding: 1rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-left: 4px solid var(--accent);
-        }
-
-        .ride-info {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .ride-time {
-            font-weight: 600;
-            font-size: 1.1rem;
-        }
-
-        .ride-route {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-        }
-
-        .ride-amount {
-            font-weight: 700;
-            font-size: 1.2rem;
-            color: var(--success);
-        }
-
+        /* Nav Tabs */
         .nav-tabs {
             display: flex;
-            background-color: var(--card-dark);
-            border-radius: 12px;
-            padding: 0.5rem;
-            margin-bottom: 1rem;
-            gap: 0.5rem;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(10px);
+            border-radius: var(--radius-md);
+            padding: 0.35rem;
+            margin-bottom: 1.2rem;
+            gap: 0.25rem;
             position: sticky;
-            top: 70px;
+            top: 68px;
             z-index: 9;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-card);
         }
 
         .tab-btn {
             background: none;
             border: none;
             color: var(--text-muted);
-            padding: 0.75rem 1rem;
-            border-radius: 8px;
+            padding: 0.65rem 0.4rem;
+            border-radius: 10px;
             font-weight: 600;
+            font-size: 0.8rem;
             cursor: pointer;
             flex: 1;
-            transition: all 0.2s;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
         }
 
         .tab-btn.active {
-            background-color: var(--accent);
-            color: var(--text-main);
+            background: var(--accent-primary);
+            color: #ffffff;
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+
+        .tab-btn i {
+            width: 18px;
+            height: 18px;
         }
 
         .section {
             display: none;
+            animation: fadeIn 0.3s ease;
         }
 
         .section.active {
             display: block;
         }
 
-        .summary-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Card */
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid var(--border-card);
+            border-radius: var(--radius-lg);
+            padding: 1.25rem;
             margin-bottom: 1rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
         }
 
-        .summary-card {
-            background-color: var(--card-dark);
+        /* Buttons */
+        .btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #ffffff;
+            border: none;
             padding: 1rem;
-            border-radius: 12px;
-            text-align: center;
-        }
-
-        .summary-value {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--accent);
-            margin-top: 0.5rem;
-        }
-
-        .summary-label {
-            font-size: 0.9rem;
-            color: var(--text-muted);
-        }
-
-        .delete-btn {
-            background-color: var(--danger);
-            padding: 0.5rem 0.75rem;
-            border-radius: 8px;
-            border: none;
-            color: var(--text-main);
-            cursor: pointer;
+            border-radius: var(--radius-md);
+            font-size: 1rem;
             font-weight: 600;
-        }
-
-        .edit-btn {
-            background-color: var(--accent);
-            padding: 0.5rem 0.75rem;
-            border-radius: 8px;
-            border: none;
-            color: var(--text-main);
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        .expense-item {
-            border-left-color: var(--warning);
-        }
-
-        .expense-amount {
-            color: var(--warning);
-        }
-
-        .progress-container {
-            background-color: var(--bg-dark);
-            border-radius: 10px;
-            height: 20px;
             width: 100%;
-            margin-top: 0.75rem;
-            overflow: hidden;
-            border: 1px solid #334155;
-            position: relative;
-        }
-
-        .progress-bar {
-            background-color: var(--success);
-            height: 100%;
-            width: 0%;
-            transition: width 0.4s ease;
-        }
-
-        .filter-btn {
-            background-color: var(--bg-dark);
-            border: 1px solid #334155;
-            color: var(--text-muted);
-            padding: 0.4rem 0.8rem;
-            border-radius: 8px;
-            font-size: 0.85rem;
             cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+            box-shadow: 0 4px 14px var(--accent-glow);
         }
 
-        .filter-btn.active {
-            background-color: var(--accent);
+        .btn:active {
+            transform: scale(0.97);
+        }
+
+        .btn-large {
+            padding: 1.4rem;
+            font-size: 1.15rem;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-card);
             color: var(--text-main);
-            border-color: var(--accent);
-        }
-    </style>
-</head>
-
-<body>
-    <header>
-        <h1>🚕 Taxi Milano 🚕</h1>
-    </header>
-
-    <div class="nav-tabs">
-        <button class="tab-btn active" onclick="switchSection('rides')">Nuova Corsa</button>
-        <button class="tab-btn" onclick="switchSection('history')">Storico</button>
-        <button class="tab-btn" onclick="switchSection('summary')">Totali</button>
-        <button class="tab-btn" onclick="switchSection('stats')">Statistiche</button>
-        <button class="tab-btn" onclick="switchSection('expenses')">Spese</button>
-        <button class="tab-btn" onclick="switchSection('settings')">Altro</button>
-    </div>
-
-    <main>
-        <!-- Nuova Corsa -->
-        <section id="rides-section" class="section active">
-            <button class="btn btn-large" onclick="openModal('start-time')">Inizio Corsa</button>
-
-            <!-- Ultima Corsa -->
-            <div id="last-ride-card" class="card" style="margin-top: 1.5rem; display: none;">
-                <h3 style="font-size: 1.1rem; color: var(--accent); margin-bottom: 0.75rem; text-align: center;">Ultima Corsa Inserita</h3>
-                <div id="last-ride-details"></div>
-            </div>
-        </section>
-
-        <!-- Storico -->
-        <section id="history-section" class="section">
-            <h2 style="margin: 0 0 1rem; font-size: 1.2rem;">Storico Corse di Oggi</h2>
-            <div id="rides-list" class="rides-list"></div>
-        </section>
-
-        <!-- Totali -->
-        <section id="summary-section" class="section">
-            <div class="summary-grid">
-                <div class="summary-card">
-                    <div class="summary-label">Totale Giornaliero</div>
-                    <div id="sum-total" class="summary-value">€0.00</div>
-                </div>
-                <div class="summary-card">
-                    <div class="summary-label">Totale Corse</div>
-                    <div id="sum-count" class="summary-value">0</div>
-                </div>
-            </div>
-            <div class="card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <span class="summary-label">Contanti</span>
-                    <span id="sum-cash" style="font-weight: 600;">€0.00</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <span class="summary-label">Carte (Nexi, Bancomat, Amex)</span>
-                    <span id="sum-cards" style="font-weight: 600;">€0.00</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span class="summary-label">Buoni / App</span>
-                    <span id="sum-vouchers" style="font-weight: 600;">€0.00</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Statistiche & Grafici & Obiettivo -->
-        <section id="stats-section" class="section">
-            <!-- Obiettivo Mensile -->
-            <div class="card">
-                <h3 style="font-size: 1.1rem; margin-bottom: 0.5rem; text-align: center;">Obiettivo Mensile (€6.000)</h3>
-                <div style="display: flex; justify-content: space-between; font-size: 0.95rem; margin-top: 0.5rem;">
-                   <span>Fatto: <strong id="obj-current" style="color: var(--success);">€0.00</strong></span>
-                   <span>Manca: <strong id="obj-remaining" style="color: var(--warning);">€6000.00</strong></span>
-                </div>
-                <div class="progress-container">
-                    <div id="obj-progress-bar" class="progress-bar"></div>
-                </div>
-                <div style="text-align: center; margin-top: 0.5rem; font-size: 0.9rem; color: var(--text-muted);" id="obj-percentage">0% raggiunto</div>
-            </div>
-
-            <!-- Statistiche Temporali -->
-            <div class="card">
-                <h3 style="font-size: 1.1rem; margin-bottom: 1rem; text-align: center;">Statistiche Temporali</h3>
-                <div style="display: flex; flex-direction: column; gap: 1rem;">
-                    <div style="display: flex; justify-content: space-between;">
-                        <span class="summary-label">Oggi:</span>
-                        <span id="stat-day" style="font-weight: 600; color: var(--accent);">€0.00</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span class="summary-label">Questa Settimana:</span>
-                        <span id="stat-week" style="font-weight: 600; color: var(--accent);">€0.00</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span class="summary-label">Questo Mese:</span>
-                        <span id="stat-month" style="font-weight: 600; color: var(--accent);">€0.00</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between;">
-                        <span class="summary-label">Quest'Anno:</span>
-                        <span id="stat-year" style="font-weight: 600; color: var(--accent);">€0.00</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Analisi Presa Chiamata (Radio vs Parcheggio/Mano) -->
-            <div class="card">
-                <h3 style="font-size: 1.1rem; margin-bottom: 0.75rem; text-align: center;">Radio vs Parcheggio / Mano</h3>
-                <div style="display: flex; justify-content: center; gap: 0.5rem; margin-bottom: 1rem;">
-                    <button class="filter-btn active" onclick="setPickupFilter('day', event)">Oggi</button>
-                    <button class="filter-btn" onclick="setPickupFilter('week', event)">Settimana</button>
-                    <button class="filter-btn" onclick="setPickupFilter('month', event)">Mese</button>
-                    <button class="filter-btn" onclick="setPickupFilter('year', event)">Anno</button>
-                </div>
-                
-                <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-dark); padding: 0.75rem; border-radius: 10px;">
-                        <div>
-                            <span style="font-weight: 600;">📻 Radio</span>
-                            <div id="pickup-radio-count" style="font-size: 0.8rem; color: var(--text-muted);">0 corse (0%)</div>
-                        </div>
-                        <span id="pickup-radio-amount" style="font-weight: 700; color: var(--accent);">€0.00 (0%)</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; background-color: var(--bg-dark); padding: 0.75rem; border-radius: 10px;">
-                        <div>
-                            <span style="font-weight: 600;">🅿️ Parcheggio / Mano</span>
-                            <div id="pickup-street-count" style="font-size: 0.8rem; color: var(--text-muted);">0 corse (0%)</div>
-                        </div>
-                        <span id="pickup-street-amount" style="font-weight: 700; color: var(--success);">€0.00 (0%)</span>
-                    </div>
-                </div>
-
-                <div style="position: relative; height: 220px; width: 100%;">
-                    <canvas id="pickupChart"></canvas>
-                </div>
-            </div>
-
-            <!-- Grafico Pagamenti -->
-            <div class="card">
-                <h3 style="font-size: 1.1rem; margin-bottom: 1rem; text-align: center;">Distribuzione Pagamenti (Mese)</h3>
-                <div style="position: relative; height: 250px; width: 100%;">
-                    <canvas id="paymentsChart"></canvas>
-                </div>
-            </div>
-        </section>
-
-        <!-- Spese -->
-        <section id="expenses-section" class="section">
-            <button class="btn btn-secondary" onclick="openExpenseModal('Benzina')">Registra Spesa Benzina</button>
-            <button class="btn btn-secondary" onclick="openExpenseModal('Casello')">Registra Spesa Casello</button>
-            <button class="btn btn-secondary" onclick="openExpenseModal('Manutenzione')">Registra Manutenzione</button>
-            <h2 style="margin: 1.5rem 0 1rem; font-size: 1.2rem;">Spese di Oggi</h2>
-            <div id="expenses-list" class="rides-list"></div>
-        </section>
-
-        <!-- Impostazioni e Backup -->
-        <section id="settings-section" class="section">
-            <button class="btn btn-secondary" onclick="exportDataExcel()">Esporta in Excel (Multi-Foglio)</button>
-            <button class="btn btn-secondary" onclick="backupData()">Backup Dati (JSON)</button>
-            <button class="btn btn-secondary" style="background-color: var(--danger);" onclick="restoreData()">Ripristina Dati</button>
-            <input type="file" id="restore-file" style="display: none;" accept=".json" onchange="handleRestore(event)">
-            <button class="btn btn-secondary" style="background-color: var(--danger);" onclick="clearAllData()">Reset Totale</button>
-        </section>
-    </main>
-
-    <!-- Pop-up Modal -->
-    <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <div id="modal-body"></div>
-        </div>
-    </div>
-
-    <script>
-        // Lista dei parcheggi taxi principali di Milano con coordinate approssimative per il calcolo della vicinanza
-        const taxiParkingMilano = [
-            { name: "Parcheggio Linate (Aeroporto)", lat: 45.4451, lon: 9.2767 },
-            { name: "Parcheggio Stazione Centrale", lat: 45.4854, lon: 9.2045 },
-            { name: "Parcheggio Cadorna", lat: 45.4688, lon: 9.1762 },
-            { name: "Parcheggio Duomo", lat: 45.4641, lon: 9.1919 },
-            { name: "Parcheggio Garibaldi", lat: 45.4822, lon: 9.1873 },
-            { name: "Parcheggio Romolo", lat: 45.4377, lon: 9.1672 },
-            { name: "Parcheggio Famagosta", lat: 45.4275, lon: 9.1652 },
-            { name: "Parcheggio Lampugnano", lat: 45.4921, lon: 9.1294 },
-            { name: "Parcheggio Porta Genova", lat: 45.4517, lon: 9.1712 },
-            { name: "Parcheggio Loreto", lat: 45.4812, lon: 9.2198 }
-        ];
-
-        let currentRide = {};
-        let editingRideId = null;
-        let currentDetectedStreet = '';
-        let amountBuffer = '';
-        let paymentsChartInstance = null;
-        let pickupChartInstance = null;
-        let currentPickupPeriod = 'day';
-
-        let rides = JSON.parse(localStorage.getItem('taxiRides')) || [];
-        let expenses = JSON.parse(localStorage.getItem('taxiExpenses')) || [];
-
-        function switchSection(sectionId) {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
-            
-            const btnIndex = ['rides', 'history', 'summary', 'stats', 'expenses', 'settings'].indexOf(sectionId);
-            if (btnIndex !== -1) {
-                document.querySelectorAll('.tab-btn')[btnIndex].classList.add('active');
-            }
-            document.getElementById(`${sectionId}-section`).classList.add('active');
-
-            if (sectionId === 'rides') updateLastRideUI();
-            if (sectionId === 'summary') updateSummaryUI();
-            if (sectionId === 'stats') {
-                updateStatsUI();
-                renderPickupStats();
-                renderPaymentsChart();
-            }
-            if (sectionId === 'history') updateRidesList();
-            if (sectionId === 'expenses') updateExpensesList();
+            box-shadow: none;
+            margin-top: 0.75rem;
         }
 
-        const modalOverlay = document.getElementById('modal-overlay');
-        const modalBody = document.getElementById('modal-body');
-
-        function openModal(step, data = {}) {
-            modalBody.innerHTML = '';
-            let title = '';
-            let content = '';
-
-            switch (step) {
-                case 'start-time':
-                    title = editingRideId ? 'Modifica Orario di Partenza' : 'Orario di Partenza';
-                    content = `<button class="btn btn-large" onclick="captureStartTime()">Inserisci Orario Tempo Reale</button>`;
-                    break;
-                case 'departure-address':
-                    title = 'Indirizzo di Partenza';
-                    content = `
-                        <button class="btn btn-large" onclick="captureDepartureLocation()">Geolocalizzazione GPS</button>
-                        <div id="gps-result" class="card"></div>
-                        <div class="input-group" style="margin-top: 1rem;">
-                            <input type="text" id="manual-departure" placeholder="Via manualmente">
-                            <button class="btn" style="width: auto;" onclick="submitManualDeparture()">Invia</button>
-                        </div>
-                    `;
-                    break;
-                case 'pickup-mode':
-                    title = 'Modalità Presa Chiamata';
-                    content = `
-                        <div class="action-grid">
-                            <button class="btn btn-large" onclick="savePickupMode('Radio 📻')">Radio 📻</button>
-                            <button class="btn btn-large" onclick="savePickupMode('Parcheggio / Mano 🅿️')">Parcheggio / Mano 🅿️</button>
-                        </div>
-                    `;
-                    break;
-                case 'arrival-address':
-                    title = 'Indirizzo di Arrivo';
-                    content = `
-                        <button class="btn btn-large" onclick="captureArrivalLocation()">Geolocalizzazione GPS</button>
-                        <div id="gps-result" class="card"></div>
-                        <div class="input-group" style="margin-top: 1rem;">
-                            <input type="text" id="manual-arrival" placeholder="Via manualmente">
-                            <button class="btn" style="width: auto;" onclick="submitManualArrival()">Invia</button>
-                        </div>
-                    `;
-                    break;
-                case 'end-time':
-                    title = 'Orario di Fine Corsa';
-                    content = `<button class="btn btn-large" onclick="captureEndTime()">Inserisci Orario Tempo Reale</button>`;
-                    break;
-                case 'amount':
-                    title = data.title || 'Importo Corsa (€)';
-                    content = `
-                        <div class="input-group">
-                            <input type="text" id="amount-display" inputmode="decimal" placeholder="00,00" readonly style="font-size: 2rem; padding: 1.5rem;">
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-top: 1rem;">
-                            <button class="btn btn-secondary" onclick="appendAmount('1')">1</button>
-                            <button class="btn btn-secondary" onclick="appendAmount('2')">2</button>
-                            <button class="btn btn-secondary" onclick="appendAmount('3')">3</button>
-                            <button class="btn btn-secondary" onclick="appendAmount('4')">4</button>
-                            <button class="btn btn-secondary" onclick="appendAmount('5')">5</button>
-                            <button class="btn btn-secondary" onclick="appendAmount('6')">6</button>
-                            <button class="btn btn-secondary" onclick="appendAmount('7')">7</button>
-                            <button class="btn btn-secondary" onclick="appendAmount('8')">8</button>
-                            <button class="btn btn-secondary" onclick="appendAmount('9')">9</button>
-                            <button class="btn btn-secondary" onclick="clearAmount()">C</button>
-                            <button class="btn btn-secondary" onclick="appendAmount('0')">0</button>
-                            <button class="btn btn-secondary" onclick="appendAmount('00')">00</button>
-                        </div>
-                        <button class="btn btn-large" style="margin-top: 1rem;" onclick="${data.submitCallback}">Invia</button>
-                    `;
-                    break;
-                case 'payment-mode':
-                    title = 'Modalità di Pagamento';
-                    content = `
-                        <div class="action-grid">
-                            <button class="btn" onclick="savePaymentMode('Contanti')">Contanti</button>
-                            <button class="btn" onclick="savePaymentMode('Nexi')">Nexi</button>
-                            <button class="btn" onclick="savePaymentMode('Bancomat')">Bancomat</button>
-                            <button class="btn" onclick="savePaymentMode('Amex')">Amex</button>
-                            <button class="btn" onclick="savePaymentStep2('App')">App</button>
-                            <button class="btn" onclick="savePaymentStep2('Importo in Centrale')">Importo in Centrale</button>
-                            <button class="btn" onclick="savePaymentStep3('Assegno')">Assegno</button>
-                            <button class="btn" onclick="savePaymentStep2('Globix')">Globix</button>
-                            <button class="btn" onclick="savePaymentStep2('Samarcanda')">Samarcanda</button>
-                        </div>
-                    `;
-                    break;
-                case 'extra-code':
-                    title = data.title;
-                    content = `
-                        <div class="input-group">
-                            <input type="number" id="extra-code-input" inputmode="numeric" placeholder="${data.placeholder}">
-                            <button class="btn" style="width: auto;" onclick="submitExtraCode('${data.field}')">Invia</button>
-                        </div>
-                    `;
-                    break;
-            }
-
-            modalBody.innerHTML = `<div class="modal-title">${title}</div>${content}`;
-            modalOverlay.classList.add('active');
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
         }
 
-        function closeModal() {
-            modalOverlay.classList.remove('active');
-        }
-
-        function getCurrentDateTime() {
-            const now = new Date();
-            return {
-                time: now.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' }),
-                date: now.toISOString().split('T')[0]
-            };
-        }
-
-        function appendAmount(digit) {
-            amountBuffer += digit;
-            updateAmountDisplay();
-        }
-
-        function clearAmount() {
-            amountBuffer = '';
-            updateAmountDisplay();
-        }
-
-        function updateAmountDisplay() {
-            const display = document.getElementById('amount-display');
-            if (display) {
-                if (amountBuffer === '') {
-                    display.value = '';
-                } else {
-                    const cents = parseInt(amountBuffer, 10);
-                    const euros = (cents / 100).toFixed(2);
-                    display.value = euros.replace('.', ',');
-                }
-            }
-        }
-
-        function editRide(id) {
-            const ride = rides.find(r => r.id === id);
-            if (!ride) return;
-            editingRideId = id;
-            currentRide = { ...ride };
-            if (ride.amount) {
-                amountBuffer = Math.round(ride.amount * 100).toString();
-            } else {
-                amountBuffer = '';
-            }
-            openModal('start-time');
-        }
-
-        function updateLastRideUI() {
-            const card = document.getElementById('last-ride-card');
-            const details = document.getElementById('last-ride-details');
-            if (!card || !details) return;
-
-            if (rides.length === 0) {
-                card.style.display = 'none';
-                return;
-            }
-
-            const last = rides[rides.length - 1];
-            card.style.display = 'block';
-
-            let extraInfo = '';
-            if (last.rideNumber) extraInfo += `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">N° Corsa: ${last.rideNumber}</div>`;
-            if (last.voucherNumber) extraInfo += `<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 0.2rem;">N° Buono: ${last.voucherNumber}</div>`;
-            if (last.nearestParking) extraInfo += `<div style="font-size: 0.85rem; color: var(--success); margin-top: 0.2rem;">🅿️ ${last.nearestParking}</div>`;
-
-            details.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                    <span style="font-weight: 600; font-size: 1.1rem;">${last.startTime ? last.startTime.time : ''} - ${last.endTime ? last.endTime.time : ''}</span>
-                    <span style="font-weight: 700; font-size: 1.3rem; color: var(--success);">€${last.amount ? last.amount.toFixed(2) : '0.00'}</span>
-                </div>
-                <div style="font-size: 0.95rem; margin-bottom: 0.25rem;">📍 ${last.departureAddress || 'N/A'} ➔ ${last.arrivalAddress || 'N/A'}</div>
-                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--text-muted); margin-top: 0.5rem; border-top: 1px solid #334155; padding-top: 0.5rem;">
-                    <span>Presa: <strong>${last.pickupMode || 'N/A'}</strong></span>
-                    <span>Pagamento: <strong>${last.paymentMode || 'N/A'}</strong></span>
-                </div>
-                ${extraInfo}
-                <div style="margin-top: 1rem; display: flex; justify-content: flex-end; gap: 0.5rem;">
-                    <button class="edit-btn" onclick="editRide(${last.id})">Modifica</button>
-                    <button class="delete-btn" onclick="deleteRide(${last.id})">Elimina</button>
-                </div>
-            `;
-        }
-
-        function captureStartTime() {
-            currentRide.startTime = getCurrentDateTime();
-            closeModal();
-            openModal('departure-address');
-        }
-
-        function findNearestTaxiParking(lat, lon) {
-            if (!lat || !lon) return null;
-            let nearest = null;
-            let minDistance = Infinity;
-
-            taxiParkingMilano.forEach(parking => {
-                const dist = Math.sqrt(Math.pow(parking.lat - lat, 2) + Math.pow(parking.lon - lon, 2));
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    nearest = parking.name;
-                }
-            });
-            return nearest;
-        }
-
-        function fetchRealGPS(callback) {
-            const gpsResultDiv = document.getElementById('gps-result');
-            if (gpsResultDiv) {
-                gpsResultDiv.style.display = 'block';
-                gpsResultDiv.innerHTML = 'Rilevamento posizione GPS in corso...';
-            }
-
-            if (!navigator.geolocation) {
-                callback("Milano Centro", null, null);
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(
-                position => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    const nearestParking = findNearestTaxiParking(lat, lon);
-                    
-                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
-                        .then(response => {
-                            if (!response.ok) throw new Error("Errore rete geocoding");
-                            return response.json();
-                        })
-                        .then(data => {
-                            let via = "";
-                            if (data && data.address) {
-                                via = data.address.road || data.address.pedestrian || data.address.street || data.address.suburb || data.address.neighbourhood || "";
-                            }
-                            if (!via && data && data.display_name) {
-                                via = data.display_name.split(',')[0];
-                            }
-                            
-                            via = via.replace(/[0-9]/g, '').trim();
-                            
-                            if (!via || via === "_") {
-                                via = "Milano (Zona Generica)";
-                            }
-                            
-                            callback(via, nearestParking);
-                        })
-                        .catch(() => {
-                            callback("Milano Centro", nearestParking);
-                        });
-                },
-                error => {
-                    callback("Milano Centro", null);
-                },
-                {
-                    enableHighAccuracy: true,
-                    timeout: 12000,
-                    maximumAge: 0
-                }
-            );
-        }
-
-        function captureDepartureLocation() {
-            fetchRealGPS((street, nearestParking) => {
-                currentDetectedStreet = street;
-                currentRide.nearestParking = nearestParking;
-                const gpsResultDiv = document.getElementById('gps-result');
-                if (gpsResultDiv) {
-                    gpsResultDiv.style.display = 'block';
-                    gpsResultDiv.innerHTML = `<div>Posizione Rilevata:</div><div style="font-size: 1.2rem; color: var(--text-main); margin-top:0.5rem;">${street}</div>${nearestParking ? `<div style="font-size: 0.9rem; color: var(--success); margin-top:0.3rem;">Parcheggio vicino: ${nearestParking}</div>` : ''}`;
-                }
-                const inputManual = document.getElementById('manual-departure');
-                if (inputManual) inputManual.value = street;
-
-                const modalContent = modalBody.querySelector('.modal-content');
-                if(modalContent && !document.getElementById('gps-ok-btn')) {
-                    const btn = document.createElement('button');
-                    btn.id = 'gps-ok-btn';
-                    btn.className = 'btn btn-large';
-                    btn.style.marginTop = '1rem';
-                    btn.style.backgroundColor = 'var(--success)';
-                    btn.innerText = 'Conferma Indirizzo';
-                    btn.onclick = () => {
-                        currentRide.departureAddress = currentDetectedStreet;
-                        closeModal();
-                        openModal('pickup-mode');
-                    };
-                    modalContent.appendChild(btn);
-                }
-            });
-        }
-
-        function submitManualDeparture() {
-            const val = document.getElementById('manual-departure').value;
-            if (!val) return alert("Inserisci una via");
-            currentRide.departureAddress = val;
-            currentRide.nearestParking = "Parcheggio Manuale / Via";
-            closeModal();
-            openModal('pickup-mode');
-        }
-
-        function savePickupMode(mode) {
-            currentRide.pickupMode = mode;
-            closeModal();
-            openModal('arrival-address');
-        }
-
-        function captureArrivalLocation() {
-            fetchRealGPS((street) => {
-                currentDetectedStreet = street;
-                const gpsResultDiv = document.getElementById('gps-result');
-                if (gpsResultDiv) {
-                    gpsResultDiv.style.display = 'block';
-                    gpsResultDiv.innerHTML = `<div>Posizione Rilevata:</div><div style="font-size: 1.2rem; color: var(--text-main); margin-top:0.5rem;">${street}</div>`;
-                }
-                const inputManual = document.getElementById('manual-arrival');
-                if (inputManual) inputManual.value = street;
-
-                const modalContent = modalBody.querySelector('.modal-content');
-                if(modalContent && !document.getElementById('gps-ok-btn')) {
-                    const btn = document.createElement('button');
-                    btn.id = 'gps-ok-btn';
-                    btn.className = 'btn btn-large';
-                    btn.style.marginTop = '1rem';
-                    btn.style.backgroundColor = 'var(--success)';
-                    btn.innerText = 'Conferma Indirizzo';
-                    btn.onclick = () => {
-                        currentRide.arrivalAddress = currentDetectedStreet;
-                        closeModal();
-                        openModal('end-time');
-                    };
-                    modalContent.appendChild(btn);
-                }
-            });
-        }
-
-        function submitManualArrival() {
-            const val = document.getElementById('manual-arrival').value;
-            if (!val) return alert("Inserisci una via");
-            currentRide.arrivalAddress = val;
-            closeModal();
-            openModal('end-time');
-        }
-
-        function captureEndTime() {
-            currentRide.endTime = getCurrentDateTime();
-            if (editingRideId && currentRide.amount) {
-                amountBuffer = Math.round(currentRide.amount * 100).toString();
-            } else {
-                amountBuffer = '';
-            }
-            closeModal();
-            openModal('amount', { title: 'Importo Corsa (€)', submitCallback: 'submitRideAmount()' });
-        }
-
-        function submitRideAmount() {
-            if (amountBuffer === '') return alert("Inserisci l'importo");
-            currentRide.amount = parseInt(amountBuffer, 10) / 100;
-            closeModal();
-            openModal('payment-mode');
-        }
-
-        function savePaymentMode(mode) {
-            currentRide.paymentMode = mode;
-            currentRide.paymentSubtype = mode;
-            finalizeRide();
-        }
-
-        function savePaymentStep2(mode) {
-            currentRide.paymentMode = mode;
-            currentRide.paymentSubtype = mode;
-            closeModal();
-            openModal('extra-code', { title: 'Numero Corsa', placeholder: 'Numero corsa', field: 'rideNumber' });
-        }
-
-        function savePaymentStep3(mode) {
-            currentRide.paymentMode = mode;
-            currentRide.paymentSubtype = mode;
-            closeModal();
-            openModal('extra-code', { title: 'Numero Buono', placeholder: 'Numero buono', field: 'voucherNumber' });
-        }
-
-        function submitExtraCode(field) {
-            const val = document.getElementById('extra-code-input').value;
-            if (!val) return alert("Inserisci il valore richiesto");
-            currentRide[field] = val;
-            finalizeRide();
-        }
-
-        function finalizeRide() {
-            if (editingRideId) {
-                rides = rides.map(r => r.id === editingRideId ? { ...currentRide } : r);
-                editingRideId = null;
-            } else {
-                currentRide.id = Date.now();
-                currentRide.date = getCurrentDateTime().date;
-                currentRide.type = 'ride';
-                rides.push(currentRide);
-            }
-            localStorage.setItem('taxiRides', JSON.stringify(rides));
-            currentRide = {};
-            closeModal();
-            switchSection('rides');
-        }
-
-        let currentExpenseType = '';
-        let currentExpenseDesc = '';
-
-        function openExpenseModal(type) {
-            amountBuffer = '';
-            currentExpenseType = type;
-            
-            if (type === 'Manutenzione') {
-                modalBody.innerHTML = `
-                    <div class="modal-title">Spesa ${type}</div>
-                    <div class="input-group" style="margin-bottom:1rem"><input type="text" id="exp-desc" placeholder="Tipo manutenzione"></div>
-                    <button class="btn btn-large" onclick="saveExpenseDesc()">Avanti</button>
-                `;
-                modalOverlay.classList.add('active');
-            } else {
-                currentExpenseDesc = '';
-                openModal('amount', { title: `Spesa ${type} (€)`, submitCallback: 'submitExpenseAmount()' });
-            }
-        }
-
-        function saveExpenseDesc() {
-            const desc = document.getElementById('exp-desc').value;
-            if (!desc) return alert("Inserisci la descrizione");
-            currentExpenseDesc = desc;
-            closeModal();
-            openModal('amount', { title: `Spesa ${currentExpenseType} (€)`, submitCallback: 'submitExpenseAmount()' });
-        }
-
-        function submitExpenseAmount() {
-            if (amountBuffer === '') return alert("Inserisci l'importo");
-            const amount = parseInt(amountBuffer, 10) / 100;
-            
-            const exp = {
-                id: Date.now(),
-                type: 'expense',
-                category: currentExpenseType,
-                amount: amount,
-                date: getCurrentDateTime().date,
-                description: currentExpenseDesc
-            };
-
-            expenses.push(exp);
-            localStorage.setItem('taxiExpenses', JSON.stringify(expenses));
-            closeModal();
-            switchSection('expenses');
-        }
-
-        function updateRidesList() {
-            const today = getCurrentDateTime().date;
-            const container = document.getElementById('rides-list');
-            if(!container) return;
-            container.innerHTML = '';
-
-            rides.filter(r => r.date === today).reverse().forEach(r => {
-                const item = document.createElement('div');
-                item.className = 'ride-item';
-                item.innerHTML = `
-                    <div class="ride-info">
-                        <div class="ride-time">${r.startTime ? r.startTime.time : ''} - ${r.endTime ? r.endTime.time : ''}</div>
-                        <div class="ride-route">${r.departureAddress || 'Via non disponibile'} ➔ ${r.arrivalAddress || 'Via non disponibile'}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">${r.pickupMode || ''} | ${r.paymentMode || ''}</div>
-                        ${r.nearestParking ? `<div style="font-size: 0.75rem; color: var(--success);">🅿️ ${r.nearestParking}</div>` : ''}
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div class="ride-amount">€${r.amount ? r.amount.toFixed(2) : '0.00'}</div>
-                        <button class="edit-btn" onclick="editRide(${r.id})">Mod</button>
-                        <button class="delete-btn" onclick="deleteRide(${r.id})">X</button>
-                    </div>
-                `;
-                container.appendChild(item);
-            });
-        }
-
-        function deleteRide(id) {
-            if (!confirm('Eliminare corsa?')) return;
-            rides = rides.filter(r => r.id !== id);
-            localStorage.setItem('taxiRides', JSON.stringify(rides));
-            updateRidesList();
-            updateLastRideUI();
-        }
-
-        function updateExpensesList() {
-            const today = getCurrentDateTime().date;
-            const container = document.getElementById('expenses-list');
-            if(!container) return;
-            container.innerHTML = '';
-
-            expenses.filter(e => e.date === today).reverse().forEach(e => {
-                const item = document.createElement('div');
-                item.className = 'ride-item expense-item';
-                item.innerHTML = `
-                    <div class="ride-info">
-                        <div class="ride-time">${e.category}</div>
-                        <div class="ride-route">${e.description || ''}</div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 1rem;">
-                        <div class="ride-amount expense-amount">€${e.amount.toFixed(2)}</div>
-                        <button class="delete-btn" onclick="deleteExpense(${e.id})">X</button>
-                    </div>
-                `;
-                container.appendChild(item);
-            });
-        }
-
-        function deleteExpense(id) {
-            if (!confirm('Eliminare spesa?')) return;
-            expenses = expenses.filter(e => e.id !== id);
-            localStorage.setItem('taxiExpenses', JSON.stringify(expenses));
-            updateExpensesList();
-        }
-
-        function clearAllData() {
-            if (!confirm('Eliminare tutti i dati salvati?')) return;
-            localStorage.clear();
-            location.reload();
-        }
-
-        function updateSummaryUI() {
-            const today = getCurrentDateTime().date;
-            const todayRides = rides.filter(r => r.date === today);
-            
-            let total = 0, cash = 0, cards = 0, vouchers = 0;
-            const cardTypes = ['Nexi', 'Bancomat', 'Amex'];
-            const voucherTypes = ['App', 'Importo in Centrale', 'Assegno', 'Globix', 'Samarcanda'];
-
-            todayRides.forEach(r => {
-                total += r.amount || 0;
-                if (r.paymentSubtype === 'Contanti') cash += r.amount || 0;
-                else if (cardTypes.includes(r.paymentSubtype)) cards += r.amount || 0;
-                else if (voucherTypes.includes(r.paymentSubtype)) vouchers += r.amount || 0;
-            });
-
-            document.getElementById('sum-total').innerText = `€${total.toFixed(2)}`;
-            document.getElementById('sum-count').innerText = todayRides.length;
-            document.getElementById('sum-cash').innerText = `€${cash.toFixed(2)}`;
-            document.getElementById('sum-cards').innerText = `€${cards.toFixed(2)}`;
-            document.getElementById('sum-vouchers').innerText = `€${vouchers.toFixed(2)}`;
-        }
-
-        function updateStatsUI() {
-            const today = getCurrentDateTime().date;
-            const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString().split('T')[0];
-            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-            const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-
-            let dayTotal = 0, weekTotal = 0, monthTotal = 0, yearTotal = 0;
-
-            rides.forEach(r => {
-                const amt = r.amount || 0;
-                if (r.date === today) dayTotal += amt;
-                if (r.date >= startOfWeek) weekTotal += amt;
-                if (r.date >= startOfMonth) monthTotal += amt;
-                if (r.date >= startOfYear) yearTotal += amt;
-            });
-
-            document.getElementById('stat-day').innerText = `€${dayTotal.toFixed(2)}`;
-            document.getElementById('stat-week').innerText = `€${weekTotal.toFixed(2)}`;
-            document.getElementById('stat-month').innerText = `€${monthTotal.toFixed(2)}`;
-            document.getElementById('stat-year').innerText = `€${yearTotal.toFixed(2)}`;
-
-            const targetAmount = 6000;
-            const remaining = Math.max(0, targetAmount - monthTotal);
-            const percentage = Math.min(100, (monthTotal / targetAmount) * 100);
-
-            document.getElementById('obj-current').innerText = `€${monthTotal.toFixed(2)}`;
-            document.getElementById('obj-remaining').innerText = `€${remaining.toFixed(2)}`;
-            document.getElementById('obj-progress-bar').style.width = `${percentage}%`;
-            document.getElementById('obj-percentage').innerText = `${percentage.toFixed(1)}% raggiunto dell'obiettivo`;
-        }
-
-        function setPickupFilter(period, evt) {
-            currentPickupPeriod = period;
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-            if (evt && evt.target) {
-                evt.target.classList.add('active');
-            }
-            renderPickupStats();
-        }
-
-        function renderPickupStats() {
-            const today = getCurrentDateTime().date;
-            const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString().split('T')[0];
-            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-            const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-
-            let filteredRides = [];
-            if (currentPickupPeriod === 'day') filteredRides = rides.filter(r => r.date === today);
-            else if (currentPickupPeriod === 'week') filteredRides = rides.filter(r => r.date >= startOfWeek);
-            else if (currentPickupPeriod === 'month') filteredRides = rides.filter(r => r.date >= startOfMonth);
-            else if (currentPickupPeriod === 'year') filteredRides = rides.filter(r => r.date >= startOfYear);
-
-            let radioCount = 0, streetCount = 0;
-            let radioAmount = 0, streetAmount = 0;
-
-            filteredRides.forEach(r => {
-                const amt = r.amount || 0;
-                if (r.pickupMode && r.pickupMode.includes('Radio')) {
-                    radioCount++;
-                    radioAmount += amt;
-                } else {
-                    streetCount++;
-                    streetAmount += amt;
-                }
-            });
-
-            const totalCount = filteredRides.length;
-            const totalAmount = radioAmount + streetAmount;
-
-            const radioCountPct = totalCount ? ((radioCount / totalCount) * 100).toFixed(1) : '0.0';
-            const streetCountPct = totalCount ? ((streetCount / totalCount) * 100).toFixed(1) : '0.0';
-
-            const radioAmountPct = totalAmount ? ((radioAmount / totalAmount) * 100).toFixed(1) : '0.0';
-            const streetAmountPct = totalAmount ? ((streetAmount / totalAmount) * 100).toFixed(1) : '0.0';
-
-            document.getElementById('pickup-radio-count').innerText = `${radioCount} corse (${radioCountPct}%)`;
-            document.getElementById('pickup-radio-amount').innerText = `€${radioAmount.toFixed(2)} (${radioAmountPct}%)`;
-
-            document.getElementById('pickup-street-count').innerText = `${streetCount} corse (${streetCountPct}%)`;
-            document.getElementById('pickup-street-amount').innerText = `€${streetAmount.toFixed(2)} (${streetAmountPct}%)`;
-
-            const ctx = document.getElementById('pickupChart');
-            if (!ctx) return;
-
-            if (pickupChartInstance) {
-                pickupChartInstance.destroy();
-            }
-
-            pickupChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Radio 📻', 'Parcheggio/Mano 🅿️'],
-                    datasets: [
-                        {
-                            label: 'Incasso (€)',
-                            data: [radioAmount, streetAmount],
-                            backgroundColor: ['#3b82f6', '#10b981'],
-                            borderRadius: 8
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            ticks: { color: '#94a3b8' },
-                            grid: { color: '#334155' }
-                        },
-                        x: {
-                            ticks: { color: '#f8fafc' },
-                            grid: { display: false }
-                        }
-                    }
-                }
-            });
-        }
-
-        function renderPaymentsChart() {
-            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-            const monthRides = rides.filter(r => r.date >= startOfMonth);
-
-            let cash = 0, cards = 0, vouchers = 0;
-            const cardTypes = ['Nexi', 'Bancomat', 'Amex'];
-            const voucherTypes = ['App', 'Importo in Centrale', 'Assegno', 'Globix', 'Samarcanda'];
-
-            monthRides.forEach(r => {
-                const amt = r.amount || 0;
-                if (r.paymentSubtype === 'Contanti') cash += amt;
-                else if (cardTypes.includes(r.paymentSubtype)) cards += amt;
-                else if (voucherTypes.includes(r.paymentSubtype)) vouchers += amt;
-            });
-
-            const ctx = document.getElementById('paymentsChart');
-            if (!ctx) return;
-
-            if (paymentsChartInstance) {
-                paymentsChartInstance.destroy();
-            }
-
-            paymentsChartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Contanti', 'Carte', 'Buoni / App'],
-                    datasets: [{
-                        data: [cash, cards, vouchers],
-                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom',
-                            labels: {
-                                color: '#f8fafc',
-                                font: { size: 12 }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        function groupDataByDate() {
-            const allDates = new Set([...rides.map(r => r.date), ...expenses.map(e => e.date)]);
-            const sortedDates = Array.from(allDates).sort();
-            
-            return sortedDates.map(date => {
-                const dayRides = rides.filter(r => r.date === date);
-                const dayExpenses = expenses.filter(e => e.date === date);
-                return { date, rides: dayRides, expenses: dayExpenses };
-            });
-        }
-
-        function exportDataExcel() {
-            const grouped = groupDataByDate();
-            const dayNames = ["Domenica", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato"];
-            const cardTypes = ['Nexi', 'Bancomat', 'Amex'];
-            const voucherTypes = ['App', 'Importo in Centrale', 'Assegno', 'Globix', 'Samarcanda'];
-
-            const ridesSheetData = [];
-            grouped.forEach(day => {
-                const dateObj = new Date(day.date);
-                const formattedDate = `${dayNames[dateObj.getDay()]} ${dateObj.getDate()} ${dateObj.toLocaleString('it-IT', { month: 'long' })} ${dateObj.getFullYear()}`;
-                
-                const benzina = day.expenses.filter(e => e.category === 'Benzina').reduce((sum, e) => sum + e.amount, 0);
-                const caselli = day.expenses.filter(e => e.category === 'Casello').reduce((sum, e) => sum + e.amount, 0);
-                const manutenzioni = day.expenses.filter(e => e.category === 'Manutenzione');
-
-                day.rides.forEach((r, index) => {
-                    let manDesc = '';
-                    let manImporto = '';
-                    if (index === 0 && manutenzioni.length > 0) {
-                        manDesc = manutenzioni.map(m => m.description).join(', ');
-                        manImporto = manutenzioni.reduce((sum, m) => sum + m.amount, 0).toFixed(2);
-                    }
-
-                    ridesSheetData.push({
-                        "Data": index === 0 ? formattedDate : '',
-                        "Orario Partenza": r.startTime ? r.startTime.time : '',
-                        "Orario Arrivo": r.endTime ? r.endTime.time : '',
-                        "Indirizzo Partenza": r.departureAddress,
-                        "Parcheggio Più Vicino": r.nearestParking || '',
-                        "Indirizzo Arrivo": r.arrivalAddress,
-                        "Importo": r.amount ? r.amount.toFixed(2) : '0.00',
-                        "Tipologia Pagamento": r.paymentMode,
-                        "Modalità Presa": r.pickupMode || '',
-                        "Benzina": index === 0 && benzina > 0 ? benzina.toFixed(2) : '',
-                        "Caselli": index === 0 && caselli > 0 ? caselli.toFixed(2) : '',
-                        "Manutenzione": manDesc,
-                        "Importo Manutenzione": manImporto
-                    });
-                });
-                if (day.rides.length === 0) {
-                     ridesSheetData.push({
-                        "Data": formattedDate, "Orario Partenza": '', "Orario Arrivo": '', "Indirizzo Partenza": '', "Parcheggio Più Vicino": '', "Indirizzo Arrivo": '', 
-                        "Importo": '', "Tipologia Pagamento": '', "Modalità Presa": '',
-                        "Benzina": benzina > 0 ? benzina.toFixed(2) : '', 
-                        "Caselli": caselli > 0 ? caselli.toFixed(2) : '', 
-                        "Manutenzione": manutenzioni.map(m => m.description).join(', '), 
-                        "Importo Manutenzione": manutenzioni.reduce((sum, m) => sum + m.amount, 0).toFixed(2)
-                    });
-                }
-            });
-
-            const cardsSheetData = grouped.map(day => {
-                const dayRides = day.rides.filter(r => cardTypes.includes(r.paymentSubtype));
-                return {
-                    "Data": day.date,
-                    "Totale Carte": dayRides.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Nexi": dayRides.filter(r => r.paymentSubtype === 'Nexi').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Bancomat": dayRides.filter(r => r.paymentSubtype === 'Bancomat').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Amex": dayRides.filter(r => r.paymentSubtype === 'Amex').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)
-                };
-            });
-
-            const vouchersSheetData = grouped.map(day => {
-                const dayRides = day.rides.filter(r => voucherTypes.includes(r.paymentSubtype));
-                return {
-                    "Data": day.date,
-                    "Totale Buoni": dayRides.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "App": dayRides.filter(r => r.paymentSubtype === 'App').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Importo in Centrale": dayRides.filter(r => r.paymentSubtype === 'Importo in Centrale').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Assegno": dayRides.filter(r => r.paymentSubtype === 'Assegno').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Globix": dayRides.filter(r => r.paymentSubtype === 'Globix').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Samarcanda": dayRides.filter(r => r.paymentSubtype === 'Samarcanda').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)
-                };
-            });
-
-            const monthlySheetData = [];
-            grouped.forEach(day => {
-                const dayRides = day.rides;
-                const total = dayRides.reduce((sum, r) => sum + (r.amount || 0), 0);
-                const cash = dayRides.filter(r => r.paymentSubtype === 'Contanti').reduce((sum, r) => sum + (r.amount || 0), 0);
-                const cards = dayRides.filter(r => cardTypes.includes(r.paymentSubtype)).reduce((sum, r) => sum + (r.amount || 0), 0);
-                const vouchers = dayRides.filter(r => voucherTypes.includes(r.paymentSubtype)).reduce((sum, r) => sum + (r.amount || 0), 0);
-                const tracked = cards + vouchers;
-                const settanta = total * 0.70;
-
-                monthlySheetData.push({
-                    "Data": day.date,
-                    "Totale Giornaliero": total.toFixed(2),
-                    "Totale Contanti": cash.toFixed(2),
-                    "Totale Carte": cards.toFixed(2),
-                    "Totale Buoni": vouchers.toFixed(2),
-                    "Totale Tracciato": tracked.toFixed(2),
-                    "70% Totale": settanta.toFixed(2),
-                    "CORRISPETTIVI": ""
-                });
-            });
-
-            const corrSheetData = grouped.map(day => {
-                const dateObj = new Date(day.date);
-                const formattedDate = `${dayNames[dateObj.getDay()]} ${dateObj.getDate()} ${dateObj.toLocaleString('it-IT', { month: 'long' })} ${dateObj.getFullYear()}`;
-                
-                const total = day.rides.reduce((sum, r) => sum + (r.amount || 0), 0);
-                const settanta = (total * 0.70).toFixed(2);
-
-                return {
-                    "Data": formattedDate,
-                    "Corrispettivi": settanta
-                };
-            });
-
-            const wb = XLSX.utils.book_new();
-
-            const wsCorse = XLSX.utils.json_to_sheet(ridesSheetData);
-            const wsCards = XLSX.utils.json_to_sheet(cardsSheetData);
-            const wsVouchers = XLSX.utils.json_to_sheet(vouchersSheetData);
-            const wsMonthly = XLSX.utils.json_to_sheet(monthlySheetData);
-            const wsCorr = XLSX.utils.json_to_sheet(corrSheetData);
-
-            XLSX.utils.book_append_sheet(wb, wsCorse, "Corse");
-            XLSX.utils.book_append_sheet(wb, wsCards, "Carte");
-            XLSX.utils.book_append_sheet(wb, wsVouchers, "Buoni");
-            XLSX.utils.book_append_sheet(wb, wsMonthly, "Totale Mensile");
-            XLSX.utils.book_append_sheet(wb, wsCorr, "Corrispettivi");
-
-            XLSX.writeFile(wb, "Taximeter_Data.xlsx");
-        }
-
-        function backupData() {
-            const blob = new Blob([JSON.stringify({ rides, expenses })], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'backup_taxi.json';
-            a.click();
-        }
-
-        function restoreData() {
-            document.getElementById('restore-file').click();
-        }
-
-        function handleRestore(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                const data = JSON.parse(evt.target.result);
-                rides = data.rides || [];
-                expenses = data.expenses || [];
-                localStorage.setItem('taxiRides', JSON.stringify(rides));
-                localStorage.setItem('taxiExpenses', JSON.stringify(expenses));
-                location.reload();
-            };
-            reader.readAsText(file);
-        }
-
-        switchSection('rides');
-    </script>
-</body>
-
-</html>
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            box-shadow: 0 4
