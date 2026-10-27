@@ -993,4 +993,826 @@
             openModal('arrival-address');
         }
 
-        function captureArrivalLocation
+        function captureArrivalLocation() {
+            fetchRealGPS((street) => {
+                currentDetectedStreet = street;
+                const gpsResultDiv = document.getElementById('gps-result');
+                if (gpsResultDiv) {
+                    gpsResultDiv.style.display = 'block';
+                    gpsResultDiv.innerHTML = `<div style="font-size:0.8rem; color:var(--text-muted);">Arrivo:</div><div style="font-size:1rem; font-weight:700;">${street}</div>`;
+                }
+                const inputManual = document.getElementById('manual-arrival');
+                if (inputManual) inputManual.value = street;
+
+                const modalContent = modalBody.querySelector('.modal-content');
+                if (modalContent && !document.getElementById('gps-ok-btn')) {
+                    const btn = document.createElement('button');
+                    btn.id = 'gps-ok-btn';
+                    btn.className = 'btn btn-large';
+                    btn.style.marginTop = '0.75rem';
+                    btn.innerText = 'Conferma';
+                    btn.onclick = () => {
+                        currentRide.arrivalAddress = currentDetectedStreet;
+                        closeModal();
+                        openModal('end-time');
+                    };
+                    modalContent.appendChild(btn);
+                }
+            });
+        }
+
+        function submitManualArrival() {
+            const val = document.getElementById('manual-arrival').value;
+            if (!val) return alert("Inserisci una via");
+            currentRide.arrivalAddress = val;
+            closeModal();
+            openModal('end-time');
+        }
+
+        function captureEndTime() {
+            currentRide.endTime = getCurrentDateTime();
+            amountBuffer = '';
+            closeModal();
+            openModal('amount', { title: 'Importo Corsa (€)', submitCallback: 'submitRideAmount()' });
+        }
+
+        function submitRideAmount() {
+            if (amountBuffer === '') return alert("Inserisci l'importo");
+            currentRide.amount = parseInt(amountBuffer, 10) / 100;
+            closeModal();
+            openModal('payment-mode');
+        }
+
+        function savePaymentMode(mode) {
+            currentRide.paymentMode = mode;
+            currentRide.paymentSubtype = mode;
+            finalizeRide();
+        }
+
+        function savePaymentStep2(mode) {
+            currentRide.paymentMode = mode;
+            currentRide.paymentSubtype = mode;
+            closeModal();
+            openModal('extra-code', { title: 'Numero Corsa', placeholder: 'Numero corsa', field: 'rideNumber' });
+        }
+
+        function savePaymentStep3(mode) {
+            currentRide.paymentMode = mode;
+            currentRide.paymentSubtype = mode;
+            closeModal();
+            openModal('extra-code', { title: 'Numero Buono', placeholder: 'Numero buono', field: 'voucherNumber' });
+        }
+
+        function submitExtraCode(field) {
+            const val = document.getElementById('extra-code-input').value;
+            if (!val) return alert("Inserisci il valore");
+            currentRide[field] = val;
+            finalizeRide();
+        }
+
+        function finalizeRide() {
+            currentRide.id = Date.now();
+            currentRide.date = getCurrentDateTime().date;
+            rides.push(currentRide);
+            localStorage.setItem('taxiRides', JSON.stringify(rides));
+            currentRide = {};
+            closeModal();
+            switchSection('rides');
+        }
+
+        let currentExpenseType = '';
+        let currentExpenseDesc = '';
+
+        function openExpenseModal(type) {
+            amountBuffer = '';
+            currentExpenseType = type;
+            if (type === 'Manutenzione') {
+                modalBody.innerHTML = `
+                    <div class="modal-title">Spesa ${type}</div>
+                    <div class="input-group" style="margin-bottom:0.75rem"><input type="text" id="exp-desc" placeholder="Descrizione"></div>
+                    <button class="btn btn-large" onclick="saveExpenseDesc()">Avanti</button>
+                `;
+                modalOverlay.classList.add('active');
+            } else {
+                currentExpenseDesc = '';
+                openModal('amount', { title: `Spesa ${type} (€)`, submitCallback: 'submitExpenseAmount()' });
+            }
+        }
+
+        function saveExpenseDesc() {
+            const desc = document.getElementById('exp-desc').value;
+            if (!desc) return alert("Inserisci la descrizione");
+            currentExpenseDesc = desc;
+            closeModal();
+            openModal('amount', { title: `Spesa ${currentExpenseType} (€)`, submitCallback: 'submitExpenseAmount()' });
+        }
+
+        function submitExpenseAmount() {
+            if (amountBuffer === '') return alert("Inserisci l'importo");
+            const amount = parseInt(amountBuffer, 10) / 100;
+            expenses.push({
+                id: Date.now(),
+                category: currentExpenseType,
+                amount: amount,
+                date: getCurrentDateTime().date,
+                description: currentExpenseDesc
+            });
+            localStorage.setItem('taxiExpenses', JSON.stringify(expenses));
+            closeModal();
+            switchSection('expenses');
+        }
+
+        function updateRidesList() {
+            const today = getCurrentDateTime().date;
+            const container = document.getElementById('rides-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            rides.filter(r => r.date === today).reverse().forEach(r => {
+                const item = document.createElement('div');
+                item.className = 'ride-item';
+                item.innerHTML = `
+                    <div class="ride-info">
+                        <div style="font-weight: 700;">${r.startTime ? r.startTime.time : ''} - ${r.endTime ? r.endTime.time : ''}</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">${r.departureAddress || ''} ➔ ${r.arrivalAddress || ''}</div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">${r.pickupMode || ''} • ${r.paymentMode || ''}</div>
+                        ${r.nearestParking ? `<div style="font-size: 0.75rem; color: var(--success);">🅿️ ${r.nearestParking}</div>` : ''}
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.4rem;">
+                        <div class="ride-amount">€${r.amount ? r.amount.toFixed(2) : '0.00'}</div>
+                        <button class="edit-btn" onclick="openEditRideModal(${r.id})">Mod</button>
+                        <button class="delete-btn" onclick="deleteRide(${r.id})">X</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function deleteRide(id) {
+            if (!confirm('Eliminare corsa?')) return;
+            rides = rides.filter(r => r.id !== id);
+            localStorage.setItem('taxiRides', JSON.stringify(rides));
+            updateRidesList();
+            updateLastRideUI();
+        }
+
+        function updateExpensesList() {
+            const today = getCurrentDateTime().date;
+            const container = document.getElementById('expenses-list');
+            if (!container) return;
+            container.innerHTML = '';
+
+            expenses.filter(e => e.date === today).reverse().forEach(e => {
+                const item = document.createElement('div');
+                item.className = 'ride-item';
+                item.innerHTML = `
+                    <div class="ride-info">
+                        <div style="font-weight: 700;">${e.category}</div>
+                        <div style="font-size: 0.85rem; color: var(--text-muted);">${e.description || ''}</div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <div class="ride-amount" style="color: var(--warning);">€${e.amount.toFixed(2)}</div>
+                        <button class="delete-btn" onclick="deleteExpense(${e.id})">X</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+        }
+
+        function deleteExpense(id) {
+            if (!confirm('Eliminare spesa?')) return;
+            expenses = expenses.filter(e => e.id !== id);
+            localStorage.setItem('taxiExpenses', JSON.stringify(expenses));
+            updateExpensesList();
+        }
+
+        function clearAllData() {
+            if (!confirm('Eliminare definitivamente tutti i dati?')) return;
+            localStorage.clear();
+            location.reload();
+        }
+
+        // --- GESTIONE SERVIZIO & KM (Con modifica KM errati) ---
+        function openServiceModal() {
+            const activeShift = shifts.find(s => !s.endTime);
+            const lastShift = shifts.length > 0 ? shifts[shifts.length - 1] : null;
+            const lastKm = lastShift ? lastShift.endKm : 0;
+
+            if (!activeShift) {
+                modalBody.innerHTML = `
+                    <div class="modal-title">Inizio Servizio (KM)</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; text-align: center;">KM Chiusura Turno Precedente: <strong>${lastKm} km</strong></div>
+                    <div class="input-group" style="margin-bottom: 1rem;">
+                        <input type="number" id="start-km-input" placeholder="KM Partenza" inputmode="numeric">
+                    </div>
+                    <button class="btn btn-large" onclick="startServiceSubmit(${lastKm})">Inizia Turno</button>
+                `;
+            } else {
+                modalBody.innerHTML = `
+                    <div class="modal-title">Fine Servizio (KM)</div>
+                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; text-align: center;">KM Inizio Turno: <strong>${activeShift.startKm} km</strong></div>
+                    <div class="input-group" style="margin-bottom: 1rem;">
+                        <input type="number" id="end-km-input" placeholder="KM Arrivo" inputmode="numeric">
+                    </div>
+                    <button class="btn btn-large btn-danger" onclick="endServiceSubmit(${activeShift.startKm})">Termina Turno</button>
+                `;
+            }
+            modalOverlay.classList.add('active');
+        }
+
+        function startServiceSubmit(lastKm) {
+            const km = parseInt(document.getElementById('start-km-input').value, 10);
+            if (isNaN(km)) return alert("Inserisci i KM validi");
+            shifts.push({ id: Date.now(), startDate: getCurrentDateTime().date, startKm: km, endKm: null, drivenKm: 0 });
+            localStorage.setItem('taxiShifts', JSON.stringify(shifts));
+            closeModal();
+            updateServiceUI();
+        }
+
+        function endServiceSubmit(startKm) {
+            const km = parseInt(document.getElementById('end-km-input').value, 10);
+            if (isNaN(km)) return alert("Inserisci i KM validi");
+            if (km < startKm) {
+                return alert("I KM di arrivo non possono essere inferiori a quelli di partenza del turno!");
+            }
+            const driven = km - startKm;
+            shifts = shifts.map(s => {
+                if (!s.endTime) {
+                    s.endKm = km;
+                    s.drivenKm = driven;
+                    s.endTime = getCurrentDateTime().time;
+                }
+                return s;
+            });
+            localStorage.setItem('taxiShifts', JSON.stringify(shifts));
+            
+            maints.forEach(m => { m.lastKm += driven; });
+            localStorage.setItem('taxiMaints', JSON.stringify(maints));
+
+            closeModal();
+            updateServiceUI();
+            checkMaintenanceAlerts();
+        }
+
+        function updateServiceUI() {
+            const activeShift = shifts.find(s => !s.endTime);
+            const statusBox = document.getElementById('service-status-box');
+            const actionBtn = document.getElementById('service-action-btn');
+            const newRideBtn = document.getElementById('new-ride-btn');
+
+            if (activeShift) {
+                statusBox.innerHTML = `Stato: <strong style="color:var(--success);">In Servizio</strong> (Partenza: ${activeShift.startKm} km)`;
+                actionBtn.innerText = "Fine Servizio 🛑";
+                actionBtn.className = "btn btn-large btn-danger";
+                newRideBtn.style.opacity = "1";
+            } else {
+                statusBox.innerHTML = `Stato: <strong style="color:var(--text-muted);">Fuori Servizio</strong>`;
+                actionBtn.innerText = "Inizio Servizio 🟢";
+                actionBtn.className = "btn btn-large";
+                newRideBtn.style.opacity = "0.5";
+            }
+        }
+
+        function updateKmPageUI() {
+            const totalDriven = shifts.reduce((sum, s) => sum + (s.drivenKm || 0), 0);
+            document.getElementById('total-km-driven').innerText = `${totalDriven} km`;
+
+            // Lista turni per modifica KM errati
+            const shiftsContainer = document.getElementById('shifts-list');
+            shiftsContainer.innerHTML = '';
+            shifts.slice(-5).reverse().forEach(s => {
+                const item = document.createElement('div');
+                item.className = 'ride-item';
+                item.innerHTML = `
+                    <div class="ride-info">
+                        <div style="font-weight: 700;">Data: ${s.startDate}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Partenza: ${s.startKm} km | Arrivo: ${s.endKm || 'In corso'}</div>
+                    </div>
+                    <button class="edit-btn" onclick="openEditShiftModal(${s.id})">Modifica KM</button>
+                `;
+                shiftsContainer.appendChild(item);
+            });
+
+            const container = document.getElementById('maintenance-list');
+            container.innerHTML = '';
+            maints.forEach(m => {
+                const kmLeft = m.intervalKm - (m.lastKm % m.intervalKm);
+                const item = document.createElement('div');
+                item.className = 'ride-item';
+                item.innerHTML = `
+                    <div class="ride-info">
+                        <div style="font-weight: 700;">${m.name}</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Intervallo: ogni ${m.intervalKm} km</div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.9rem; font-weight: 700; color: ${kmLeft < 500 ? 'var(--danger)' : 'var(--success)'};">Mancano ${kmLeft} km</div>
+                        <button class="delete-btn" style="margin-top:0.3rem;" onclick="deleteMaint(${m.id})">Elimina</button>
+                    </div>
+                `;
+                container.appendChild(item);
+            });
+
+            const ctx = document.getElementById('kmChart');
+            if (!ctx) return;
+            if (kmChartInstance) kmChartInstance.destroy();
+
+            const lastDays = shifts.slice(-7);
+            kmChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: lastDays.map(s => s.startDate),
+                    datasets: [{
+                        label: 'KM Percorsi',
+                        data: lastDays.map(s => s.drivenKm),
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { ticks: { color: '#f8fafc' }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        let editingShiftId = null;
+        function openEditShiftModal(id) {
+            const shift = shifts.find(s => s.id === id);
+            if (!shift) return;
+            editingShiftId = id;
+            modalBody.innerHTML = `
+                <div class="modal-title">Modifica KM Turno</div>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-muted);">KM Partenza:</label>
+                        <input type="number" id="edit-start-km" value="${shift.startKm}" inputmode="numeric">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-muted);">KM Arrivo:</label>
+                        <input type="number" id="edit-end-km" value="${shift.endKm || 0}" inputmode="numeric">
+                    </div>
+                    <button class="btn btn-large" onclick="saveShiftKm()">Salva Nuovi KM</button>
+                </div>
+            `;
+            modalOverlay.classList.add('active');
+        }
+
+        function saveShiftKm() {
+            const newStart = parseInt(document.getElementById('edit-start-km').value, 10);
+            const newEnd = parseInt(document.getElementById('edit-end-km').value, 10);
+            if (isNaN(newStart) || isNaN(newEnd)) return alert("Inserisci valori numerici validi");
+            if (newEnd < newStart) return alert("I KM di arrivo non possono essere inferiori a quelli di partenza!");
+
+            shifts = shifts.map(s => {
+                if (s.id === editingShiftId) {
+                    s.startKm = newStart;
+                    s.endKm = newEnd;
+                    s.drivenKm = newEnd - newStart;
+                }
+                return s;
+            });
+            localStorage.setItem('taxiShifts', JSON.stringify(shifts));
+            closeModal();
+            updateKmPageUI();
+            updateServiceUI();
+        }
+
+        function openMaintenanceConfigModal() {
+            modalBody.innerHTML = `
+                <div class="modal-title">Nuova Manutenzione</div>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <input type="text" id="maint-name" placeholder="Nome (es. Tagliando, Gomme)">
+                    <input type="number" id="maint-km" placeholder="Intervallo KM (es. 15000)" inputmode="numeric">
+                    <button class="btn btn-large" onclick="saveNewMaintenance()">Salva Scadenza</button>
+                </div>
+            `;
+            modalOverlay.classList.add('active');
+        }
+
+        function saveNewMaintenance() {
+            const name = document.getElementById('maint-name').value;
+            const km = parseInt(document.getElementById('maint-km').value, 10);
+            if (!name || isNaN(km)) return alert("Inserisci dati validi");
+            maints.push({ id: Date.now(), name, intervalKm: km, lastKm: 0 });
+            localStorage.setItem('taxiMaints', JSON.stringify(maints));
+            closeModal();
+            updateKmPageUI();
+        }
+
+        function deleteMaint(id) {
+            maints = maints.filter(m => m.id !== id);
+            localStorage.setItem('taxiMaints', JSON.stringify(maints));
+            updateKmPageUI();
+        }
+
+        function checkMaintenanceAlerts() {
+            maints.forEach(m => {
+                const kmLeft = m.intervalKm - (m.lastKm % m.intervalKm);
+                if (kmLeft <= 500) {
+                    alert(`⚠️ ATTENZIONE SCADENZA: Manca poco per "${m.name}"! Mancano circa ${kmLeft} km.`);
+                }
+            });
+        }
+
+        function checkMonthlyPopup() {
+            const now = new Date();
+            if (now.getDate() === 1) {
+                const lastMonthExported = localStorage.getItem('taxiLastMonthlyAlert');
+                const todayStr = now.toISOString().split('T')[0];
+                if (lastMonthExported !== todayStr) {
+                    localStorage.setItem('taxiLastMonthlyAlert', todayStr);
+                    setTimeout(() => {
+                        alert("📅 È il 1° del mese! Ricordati di scaricare il foglio Excel del mese passato.");
+                    }, 1000);
+                }
+            }
+        }
+
+        // --- POP-UP FISSI REVISIONE OGNI 1 MAGGIO FINCHÉ NON SI DÀ L'OK ---
+        function checkRevisionPopups() {
+            const now = new Date();
+            const year = now.getFullYear();
+            const todayStr = `${year}-05-01`;
+
+            // Verifichiamo se oggi è il 1° maggio o se c'è un blocco attivo non confermato per l'anno in corso
+            if (now.getMonth() === 4 && now.getDate() === 1) {
+                const revDone = localStorage.getItem(`rev_done_${year}`);
+                if (!revDone) {
+                    showPersistentPopup('revision');
+                    return;
+                }
+                const payDone = localStorage.getItem(`pay_done_${year}`);
+                if (!payDone) {
+                    showPersistentPopup('payment');
+                    return;
+                }
+            }
+        }
+
+        function showPersistentPopup(type) {
+            const title = type === 'revision' ? '🚗 REVISIONE VEICOLO' : '💳 PAGAMENTO REVISIONE VEICOLO';
+            const msg = type === 'revision' 
+                ? 'È il 1° Maggio! Ricordati che devi effettuare la revisione del veicolo.' 
+                : 'È il 1° Maggio! Ricordati di effettuare il pagamento della revisione del veicolo.';
+            const key = type === 'revision' ? 'rev_done_' + new Date().getFullYear() : 'pay_done_' + new Date().getFullYear();
+
+            modalBody.innerHTML = `
+                <div class="modal-title" style="color:var(--warning);">${title}</div>
+                <p style="text-align:center; margin-bottom:1.5rem; font-size:0.95rem;">${msg}</p>
+                <button class="btn btn-large" onclick="confirmPersistentPopup('${key}')">Ho fatto / Conferma OK</button>
+            `;
+            modalOverlay.classList.add('active');
+        }
+
+        function confirmPersistentPopup(storageKey) {
+            localStorage.setItem(storageKey, 'true');
+            closeModal();
+            // Controlla se c'è l'altro pop-up da mostrare
+            checkRevisionPopups();
+        }
+
+        function exportDataExcelModal() {
+            const now = new Date();
+            const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+            const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+
+            modalBody.innerHTML = `
+                <div class="modal-title">Esportazione Excel</div>
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; text-align:center;">Seleziona il periodo da esportare:</div>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-muted);">Da data:</label>
+                        <input type="date" id="export-from" value="${firstDayLastMonth}" style="background:#0f172a; color:#fff; border:1px solid var(--border-card); padding:0.5rem; width:100%; border-radius:8px;">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-muted);">A data:</label>
+                        <input type="date" id="export-to" value="${lastDayLastMonth}" style="background:#0f172a; color:#fff; border:1px solid var(--border-card); padding:0.5rem; width:100%; border-radius:8px;">
+                    </div>
+                    <button class="btn btn-large" onclick="executeExcelExport()">Scarica Excel</button>
+                </div>
+            `;
+            modalOverlay.classList.add('active');
+        }
+
+        function formatDateExcel(dateStr) {
+            const d = new Date(dateStr);
+            const months = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+            const day = d.getDate();
+            const month = months[d.getMonth()];
+            const yearSuffix = String(d.getFullYear()).slice(-2);
+            return `${day} ${month} '${yearSuffix}`;
+        }
+
+        function executeExcelExport() {
+            const fromDate = document.getElementById('export-from').value;
+            const toDate = document.getElementById('export-to').value;
+            closeModal();
+
+            const filteredRides = rides.filter(r => r.date >= fromDate && r.date <= toDate);
+            const filteredExpenses = expenses.filter(e => e.date >= fromDate && e.date <= toDate);
+
+            const allDates = Array.from(new Set([...filteredRides.map(r => r.date), ...filteredExpenses.map(e => e.date)])).sort();
+            const cardTypes = ['Nexi', 'Bancomat', 'Amex'];
+            const voucherTypes = ['App', 'Importo in Centrale', 'Assegno', 'Globix', 'Samarcanda'];
+            const yearSuffixAll = allDates.length > 0 ? `'` + String(new Date(allDates[0]).getFullYear()).slice(-2) : `'26`;
+
+            // 1. Foglio: Tutte le Corse (Nomi colonne aggiornati)
+            const ridesSheetData = [];
+            allDates.forEach(dateStr => {
+                const formattedDate = formatDateExcel(dateStr);
+                const dayRides = filteredRides.filter(r => r.date === dateStr);
+                const dayExp = filteredExpenses.filter(e => e.date === dateStr);
+
+                const benzina = dayExp.filter(e => e.category === 'Benzina').reduce((sum, e) => sum + e.amount, 0);
+                const caselli = dayExp.filter(e => e.category === 'Casello').reduce((sum, e) => sum + e.amount, 0);
+                const manutenzioni = dayExp.filter(e => e.category === 'Manutenzione');
+
+                dayRides.forEach((r, index) => {
+                    ridesSheetData.push({
+                        "Data": index === 0 ? formattedDate : '',
+                        "Anno": yearSuffixAll,
+                        "Partenza": r.startTime ? r.startTime.time : '',
+                        "Arrivo": r.endTime ? r.endTime.time : '',
+                        "Via Partenza": r.departureAddress,
+                        "Via Arrivo": r.arrivalAddress,
+                        "Importo": r.amount ? r.amount.toFixed(2) : '0.00',
+                        "Tipo di Pagamento": r.paymentMode,
+                        "📻 / 🅿️": r.pickupMode || '',
+                        "🅿️": r.nearestParking || '',
+                        "Benzina": index === 0 && benzina > 0 ? benzina.toFixed(2) : '',
+                        "Caselli": index === 0 && caselli > 0 ? caselli.toFixed(2) : '',
+                        "Manutenzione": index === 0 && manutenzioni.length ? manutenzioni.map(m => m.description).join(', ') : '',
+                        "Importo Manutenzione": index === 0 && manutenzioni.length ? manutenzioni.reduce((sum, m) => sum + m.amount, 0).toFixed(2) : ''
+                    });
+                });
+            });
+
+            const cardsSheetData = allDates.map(dateStr => {
+                const dayRides = filteredRides.filter(r => r.date === dateStr && cardTypes.includes(r.paymentSubtype));
+                return {
+                    "Data": formatDateExcel(dateStr),
+                    "Anno": yearSuffixAll,
+                    "Totale Carte": dayRides.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
+                    "Nexi": dayRides.filter(r => r.paymentSubtype === 'Nexi').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
+                    "Bancomat": dayRides.filter(r => r.paymentSubtype === 'Bancomat').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
+                    "Amex": dayRides.filter(r => r.paymentSubtype === 'Amex').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)
+                };
+            }).filter(day => day["Totale Carte"] > 0);
+
+            const vouchersSheetData = allDates.map(dateStr => {
+                const dayRides = filteredRides.filter(r => r.date === dateStr && voucherTypes.includes(r.paymentSubtype));
+                return {
+                    "Data": formatDateExcel(dateStr),
+                    "Anno": yearSuffixAll,
+                    "Totale Buoni": dayRides.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
+                    "App": dayRides.filter(r => r.paymentSubtype === 'App').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
+                    "Importo in Centrale": dayRides.filter(r => r.paymentSubtype === 'Importo in Centrale').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
+                    "Assegno": dayRides.filter(r => r.paymentSubtype === 'Assegno').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
+                    "Globix": dayRides.filter(r => r.paymentSubtype === 'Globix').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
+                    "Samarcanda": dayRides.filter(r => r.paymentSubtype === 'Samarcanda').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)
+                };
+            }).filter(day => day["Totale Buoni"] > 0);
+
+            // Totali Giornalieri (Colonna G = 70% del totale, Colonna S = tracciato somma D+E)
+            const totalsSheetData = allDates.map(dateStr => {
+                const dayRides = filteredRides.filter(r => r.date === dateStr);
+                const dayExp = filteredExpenses.filter(e => e.date === dateStr);
+                const total = dayRides.reduce((sum, r) => sum + (r.amount || 0), 0);
+                const cash = dayRides.filter(r => r.paymentSubtype === 'Contanti').reduce((sum, r) => sum + (r.amount || 0), 0);
+                const cards = dayRides.filter(r => cardTypes.includes(r.paymentSubtype)).reduce((sum, r) => sum + (r.amount || 0), 0);
+                const vouchers = dayRides.filter(r => voucherTypes.includes(r.paymentSubtype)).reduce((sum, r) => sum + (r.amount || 0), 0);
+                const settanta = total * 0.70;
+
+                return {
+                    "Data": formatDateExcel(dateStr),
+                    "Anno": yearSuffixAll,
+                    "Totale Giorno": total.toFixed(2),
+                    "Contanti": cash.toFixed(2),
+                    "Carte": cards.toFixed(2),
+                    "Buoni / App": vouchers.toFixed(2),
+                    "Colonna G (70%)": settanta.toFixed(2),
+                    "Colonna H": "", "Colonna I": "", "Colonna J": "", "Colonna K": "",
+                    "Colonna L": "", "Colonna M": "", "Colonna N": "", "Colonna O": "",
+                    "Colonna P": "", "Colonna Q": "", "Colonna R": "",
+                    "tracciato": (cash + cards).toFixed(2)
+                };
+            });
+
+            // Corrispettivi (Colonna B riporta il 70% / importo)
+            const corrSheetData = allDates.map(dateStr => {
+                const dayRides = filteredRides.filter(r => r.date === dateStr);
+                const total = dayRides.reduce((sum, r) => sum + (r.amount || 0), 0);
+                const settanta = total * 0.70;
+                return {
+                    "Data": formatDateExcel(dateStr),
+                    "Corrispettivi (70%)": settanta.toFixed(2),
+                    "Anno": yearSuffixAll
+                };
+            });
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ridesSheetData), "Tutte le Corse");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cardsSheetData), "Carte");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vouchersSheetData), "Buoni e App");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(totalsSheetData), "Totali Giornalieri");
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(corrSheetData), "Corrispettivi");
+
+            XLSX.writeFile(wb, `Taximeter_Galbo_${fromDate}_${toDate}.xlsx`);
+        }
+
+        function backupData() {
+            const blob = new Blob([JSON.stringify({ rides, expenses, shifts, maints })], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'backup_taxi_galbo.json';
+            a.click();
+        }
+
+        function restoreData() {
+            document.getElementById('restore-file').click();
+        }
+
+        function handleRestore(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const data = JSON.parse(evt.target.result);
+                rides = data.rides || [];
+                expenses = data.expenses || [];
+                shifts = data.shifts || [];
+                maints = data.maints || maints;
+                localStorage.setItem('taxiRides', JSON.stringify(rides));
+                localStorage.setItem('taxiExpenses', JSON.stringify(expenses));
+                localStorage.setItem('taxiShifts', JSON.stringify(shifts));
+                localStorage.setItem('taxiMaints', JSON.stringify(maints));
+                location.reload();
+            };
+            reader.readAsText(file);
+        }
+
+        function setPickupFilter(period, evt) {
+            currentPickupPeriod = period;
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            if (evt && evt.target) evt.target.classList.add('active');
+            renderPickupStats();
+        }
+
+        function renderPickupStats() {
+            const today = getCurrentDateTime().date;
+            const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString().split('T')[0];
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+            const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
+
+            let filteredRides = [];
+            if (currentPickupPeriod === 'day') filteredRides = rides.filter(r => r.date === today);
+            else if (currentPickupPeriod === 'week') filteredRides = rides.filter(r => r.date >= startOfWeek);
+            else if (currentPickupPeriod === 'month') filteredRides = rides.filter(r => r.date >= startOfMonth);
+            else if (currentPickupPeriod === 'year') filteredRides = rides.filter(r => r.date >= startOfYear);
+
+            let radioCount = 0, streetCount = 0;
+            let radioAmount = 0, streetAmount = 0;
+
+            filteredRides.forEach(r => {
+                const amt = r.amount || 0;
+                if (r.pickupMode && r.pickupMode.includes('Radio')) {
+                    radioCount++;
+                    radioAmount += amt;
+                } else {
+                    streetCount++;
+                    streetAmount += amt;
+                }
+            });
+
+            const totalCount = filteredRides.length;
+
+            document.getElementById('pickup-radio-count').innerText = `${radioCount} corse (${totalCount ? ((radioCount/totalCount)*100).toFixed(1) : 0}%)`;
+            document.getElementById('pickup-radio-amount').innerText = `€${radioAmount.toFixed(2)}`;
+
+            document.getElementById('pickup-street-count').innerText = `${streetCount} corse (${totalCount ? ((streetCount/totalCount)*100).toFixed(1) : 0}%)`;
+            document.getElementById('pickup-street-amount').innerText = `€${streetAmount.toFixed(2)}`;
+
+            const ctx = document.getElementById('pickupChart');
+            if (!ctx) return;
+            if (pickupChartInstance) pickupChartInstance.destroy();
+
+            pickupChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Radio', 'Parcheggio/Mano'],
+                    datasets: [{
+                        data: [radioAmount, streetAmount],
+                        backgroundColor: ['#3b82f6', '#10b981'],
+                        borderRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { ticks: { color: '#f8fafc' }, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function renderPaymentsChart() {
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+            const monthRides = rides.filter(r => r.date >= startOfMonth);
+
+            let cash = 0, cards = 0, vouchers = 0;
+            const cardTypes = ['Nexi', 'Bancomat', 'Amex'];
+            const voucherTypes = ['App', 'Importo in Centrale', 'Assegno', 'Globix', 'Samarcanda'];
+
+            monthRides.forEach(r => {
+                const amt = r.amount || 0;
+                if (r.paymentSubtype === 'Contanti') cash += amt;
+                else if (cardTypes.includes(r.paymentSubtype)) cards += amt;
+                else if (voucherTypes.includes(r.paymentSubtype)) vouchers += amt;
+            });
+
+            const ctx = document.getElementById('paymentsChart');
+            if (!ctx) return;
+            if (paymentsChartInstance) paymentsChartInstance.destroy();
+
+            paymentsChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Contanti', 'Carte', 'Buoni / App'],
+                    datasets: [{
+                        data: [cash, cards, vouchers],
+                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#f8fafc', boxWidth: 12 } } }
+                }
+            });
+        }
+
+        function updateSummaryUI() {
+            const today = getCurrentDateTime().date;
+            const todayRides = rides.filter(r => r.date === today);
+            
+            let total = 0, cash = 0, cards = 0, vouchers = 0;
+            const cardTypes = ['Nexi', 'Bancomat', 'Amex'];
+            const voucherTypes = ['App', 'Importo in Centrale', 'Assegno', 'Globix', 'Samarcanda'];
+
+            todayRides.forEach(r => {
+                total += r.amount || 0;
+                if (r.paymentSubtype === 'Contanti') cash += r.amount || 0;
+                else if (cardTypes.includes(r.paymentSubtype)) cards += r.amount || 0;
+                else if (voucherTypes.includes(r.paymentSubtype)) vouchers += r.amount || 0;
+            });
+
+            document.getElementById('sum-total').innerText = `€${total.toFixed(2)}`;
+            document.getElementById('sum-count').innerText = todayRides.length;
+            document.getElementById('sum-cash').innerText = `€${cash.toFixed(2)}`;
+            document.getElementById('sum-cards').innerText = `€${cards.toFixed(2)}`;
+            document.getElementById('sum-vouchers').innerText = `€${vouchers.toFixed(2)}`;
+        }
+
+        function updateStatsUI() {
+            const today = getCurrentDateTime().date;
+            const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString().split('T')[0];
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+            const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
+
+            let dayTotal = 0, weekTotal = 0, monthTotal = 0, yearTotal = 0;
+
+            rides.forEach(r => {
+                const amt = r.amount || 0;
+                if (r.date === today) dayTotal += amt;
+                if (r.date >= startOfWeek) weekTotal += amt;
+                if (r.date >= startOfMonth) monthTotal += amt;
+                if (r.date >= startOfYear) yearTotal += amt;
+            });
+
+            document.getElementById('stat-day').innerText = `€${dayTotal.toFixed(2)}`;
+            document.getElementById('stat-week').innerText = `€${weekTotal.toFixed(2)}`;
+            document.getElementById('stat-month').innerText = `€${monthTotal.toFixed(2)}`;
+            document.getElementById('stat-year').innerText = `€${yearTotal.toFixed(2)}`;
+
+            const targetAmount = 6000;
+            const remaining = Math.max(0, targetAmount - monthTotal);
+            const percentage = Math.min(100, (monthTotal / targetAmount) * 100);
+
+            document.getElementById('obj-current').innerText = `€${monthTotal.toFixed(2)}`;
+            document.getElementById('obj-remaining').innerText = `€${remaining.toFixed(2)}`;
+            document.getElementById('obj-progress-bar').style.width = `${percentage}%`;
+            document.getElementById('obj-percentage').innerText = `${percentage.toFixed(1)}% raggiunto`;
+        }
+    </script>
+</body>
+</html>
