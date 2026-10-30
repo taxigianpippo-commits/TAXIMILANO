@@ -56,7 +56,6 @@
             color: #60a5fa;
         }
 
-        /* Tab di navigazione ingranditi su due righe */
         .nav-tabs {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -349,10 +348,37 @@
             border-color: var(--accent-primary);
         }
 
-        .privacy-total-box {
+        /* Box privacy & aggiungi parcheggio in basso a destra */
+        .bottom-floating-container {
             position: fixed;
             bottom: 15px;
             right: 15px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            z-index: 50;
+        }
+
+        .add-parking-quick-btn {
+            background: rgba(16, 185, 129, 0.95);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 0.75rem;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.8rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+        .add-parking-quick-btn:active {
+            transform: scale(0.95);
+        }
+
+        .privacy-total-box {
             background: rgba(15, 23, 42, 0.95);
             border: 1px solid var(--border-card);
             padding: 0.5rem 0.75rem;
@@ -360,7 +386,6 @@
             display: flex;
             align-items: center;
             gap: 0.5rem;
-            z-index: 50;
             box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             backdrop-filter: blur(5px);
         }
@@ -388,7 +413,6 @@
         <h1>🚖 APP-TAXI GALBO' 🚖</h1>
     </header>
 
-    <!-- Tab di navigazione su due righe e ingranditi -->
     <div class="nav-tabs">
         <button class="tab-btn active" onclick="switchSection('rides')">Corsa</button>
         <button class="tab-btn" onclick="switchSection('history')">Storico</button>
@@ -411,7 +435,6 @@
 
             <button id="new-ride-btn" class="btn btn-large" style="opacity: 0.5;" onclick="checkAndOpenStartRide()">Inizio Corsa</button>
 
-            <!-- Ultima Corsa visibile esattamente sotto Inizio Corsa e sopra al totale -->
             <div id="last-ride-card" class="card" style="margin-top: 1rem; display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                     <h3 style="font-size: 0.95rem; color: var(--accent-primary); font-weight: 700;">ULTIMA CORSA EFFETTUATA</h3>
@@ -556,11 +579,14 @@
         </section>
     </main>
 
-    <!-- Widget Privacy Totale in basso a destra -->
-    <div class="privacy-total-box">
-        <span>Oggi:</span>
-        <strong id="privacy-total-val">€0,00</strong>
-        <button class="privacy-eye-btn" id="privacy-eye-icon" onclick="togglePrivacyTotal()">👁️</button>
+    <!-- Widget Flottante in basso a destra (Aggiungi Parcheggio Taxi + Totale Privacy) -->
+    <div class="bottom-floating-container">
+        <button class="add-parking-quick-btn" onclick="openAddParkingModal()">🅿️ TAXI</button>
+        <div class="privacy-total-box">
+            <span>Oggi:</span>
+            <strong id="privacy-total-val">€0,00</strong>
+            <button class="privacy-eye-btn" id="privacy-eye-icon" onclick="togglePrivacyTotal()">👁️</button>
+        </div>
     </div>
 
     <!-- Modal Popup protetto -->
