@@ -355,7 +355,6 @@
             border-color: var(--accent-primary);
         }
 
-        /* Box privacy fisso in basso a destra */
         .privacy-total-box {
             position: fixed;
             bottom: 15px;
@@ -659,40 +658,7 @@
         const modalBody = document.getElementById('modal-body');
 
         function openModalContent(title, htmlContent) {
-            modalBody.innerHTML = `<div class="modal-title">${title}</div>${htmlContent}`;
-            modalOverlay.classList.add('active');
-        }
-
-        function closeModal() {
-            modalOverlay.classList.remove('active');
-        }
-
-        function cancelRideProcess() {
-            if (confirm("Vuoi annullare la corsa corrente e tornare alla schermata principale?")) {
-                currentRide = {};
-                closeModal();
-                switchSection('rides');
-            }
-        }
-
-        function togglePrivacyTotal() {
-            privacyHidden = !privacyHidden;
-            updatePrivacyTotalUI();
-        }
-
-        function updatePrivacyTotalUI() {
-            const today = getCurrentDateTime().date;
-            const todayRides = rides.filter(r => r.date === today);
-            let total = todayRides.reduce((sum, r) => sum + (r.amount || 0), 0);
-            
-            const valEl = document.getElementById('privacy-total-val');
-            const eyeEl = document.getElementById('privacy-eye-icon');
-            if (valEl) {
-                if (privacyHidden) {
-                    valEl.innerText = "••••••";
-                    if (eyeEl) eyeEl.innerText = "🙈";
-                } else {
-                    valEl.innerText = `€${total.toFixed(2)}`;
+            modalBody.innerHTML = `<div class="modal-title">${title}</div>${htmlContent}`; modalOverlay.classList.add('active'); }  function closeModal() { modalOverlay.classList.remove('active'); }  function cancelRideProcess() { if (confirm("Vuoi annullare la corsa corrente e tornare alla schermata principale?")) { currentRide = {}; closeModal(); switchSection('rides'); } }  function togglePrivacyTotal() { privacyHidden = !privacyHidden; updatePrivacyTotalUI(); }  function updatePrivacyTotalUI() { const today = getCurrentDateTime().date; const todayRides = rides.filter(r => r.date === today); let total = todayRides.reduce((sum, r) => sum + (r.amount \vert{}\vert{} 0), 0);  const valEl = document.getElementById('privacy-total-val'); const eyeEl = document.getElementById('privacy-eye-icon'); if (valEl) { if (privacyHidden) { valEl.innerText = "••••••"; if (eyeEl) eyeEl.innerText = "🙈"; } else { valEl.innerText = `€${total.toFixed(2)}`;
                     if (eyeEl) eyeEl.innerText = "👁️";
                 }
             }
@@ -708,8 +674,6 @@
             };
         }
 
-        // --- NUOVA SEQUENZA CORSA RICHIESTA ---
-        // 1. GPS Partenza -> 2. Orario Partenza -> 3. Radio/Parcheggio -> 4. Importo -> 5. Pagamento -> 6. Rileva Posizione Arrivo -> 7. Fine Corsa
         function checkAndOpenStartRide() {
             const activeShift = shifts.find(s => !s.endTime);
             if (!activeShift) {
@@ -721,7 +685,6 @@
             openDepartureGPSModal();
         }
 
-        // STEP 1: GPS Partenza
         function openDepartureGPSModal() {
             openModalContent('Indirizzo Partenza', `
                 <button class="btn btn-large" onclick="captureDepartureGPS()">Geolocalizza Posizione GPS</button>
@@ -799,8 +762,7 @@
                     gpsResultDiv.style.display = 'block';
                     gpsResultDiv.innerHTML = `
                         <div style="font-size: 0.8rem; color: var(--text-muted);">Indirizzo rilevato:</div>
-                        <div style="font-size: 1rem; font-weight:700; margin-top:0.2rem;">${street}</div>
-                        ${nearestParking ? `<div style="font-size: 0.8rem; color: var(--success); margin-top:0.2rem;">🅿️ Vicino a: <strong>${nearestParking}</strong></div>` : ''}
+                        <div style="font-size: 1rem; font-weight:700; margin-top:0.2rem;">${street}</div>${nearestParking ? `<div style="font-size: 0.8rem; color: var(--success); margin-top:0.2rem;">🅿️ Vicino a: <strong>${nearestParking}</strong></div>` : ''}
                     `;
                 }
                 const inputManual = document.getElementById('manual-departure');
@@ -827,11 +789,10 @@
             if (!val) return alert("Inserisci una via");
             currentRide.departureAddress = val;
             currentRide.nearestParking = "Manuale";
-            currentDepCoords = {lat: 45.4641, lon: 9.1919}; // Default Milano centro stimato
+            currentDepCoords = {lat: 45.4641, lon: 9.1919};
             openStartTimeModal();
         }
 
-        // STEP 2: Orario Partenza (con tastiera numerica stile orario)
         function openStartTimeModal() {
             const now = new Date();
             timeBuffer = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
@@ -898,11 +859,10 @@
                 openPickupModeModal();
             } else if (timeTargetField === 'endTime') {
                 currentRide.endTime = { time: formattedTime, date: getCurrentDateTime().date };
-                openAmountModal();
+                finalizeRide();
             }
         }
 
-        // STEP 3: Radio / Parcheggio
         function openPickupModeModal() {
             openModalContent('Modalità Presa Chiamata', `
                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
@@ -921,7 +881,6 @@
             openAmountModalStep4();
         }
 
-        // STEP 4: Importo (€)
         function openAmountModalStep4() {
             amountBuffer = '';
             openModalContent('Importo Corsa (€)', `
@@ -977,7 +936,6 @@
             openPaymentModeModal();
         }
 
-        // STEP 5: Metodo di Pagamento
         function openPaymentModeModal() {
             openModalContent('Metodo di Pagamento', `
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom:1rem;">
@@ -1035,7 +993,6 @@
             openArrivalGPSModal();
         }
 
-        // STEP 6: Rileva Posizione Arrivo
         function openArrivalGPSModal() {
             openModalContent('Indirizzo di Arrivo', `
                 <button class="btn btn-large" onclick="captureArrivalGPS()">Rileva Posizione Arrivo</button>
@@ -1083,11 +1040,10 @@
             const val = document.getElementById('manual-arrival').value;
             if (!val) return alert("Inserisci una via");
             currentRide.arrivalAddress = val;
-            currentArrCoords = {lat: 45.4700, lon: 9.1800}; // stima
+            currentArrCoords = {lat: 45.4700, lon: 9.1800};
             openEndTimeModal();
         }
 
-        // STEP 7: Fine Corsa (Orario) e Calcoli Tempo, KM, Costo min/km
         function openEndTimeModal() {
             const now = new Date();
             timeBuffer = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
@@ -1096,14 +1052,13 @@
         }
 
         function finalizeRide() {
-            // Calcolo stima KM e Tempo dalle coordinate
-            let distKm = 3.5; // default stima
+            let distKm = 3.5;
             if (currentDepCoords && currentArrCoords) {
                 let dLat = currentArrCoords.lat - currentDepCoords.lat;
                 let dLon = currentArrCoords.lon - currentDepCoords.lon;
                 distKm = Math.max(1.0, Math.round(Math.sqrt(dLat*dLat + dLon*dLon) * 111 * 10) / 10);
             }
-            let estMinutes = Math.max(5, Math.round(distKm * 3.5)); // es. 3.5 min al km in urbano
+            let estMinutes = Math.max(5, Math.round(distKm * 3.5));
             let costPerMin = estMinutes > 0 ? (currentRide.amount / estMinutes).toFixed(2) : '0.00';
             let costPerKm = distKm > 0 ? (currentRide.amount / distKm).toFixed(2) : '0.00';
 
@@ -1122,7 +1077,6 @@
             updatePrivacyTotalUI();
         }
 
-        // --- GESTIONE MAPPATURA PARCHEGGI TAXI ---
         function openAddParkingModal() {
             modalBody.innerHTML = `
                 <div class="modal-title">Aggiungi Parcheggio Taxi</div>
@@ -1151,7 +1105,7 @@
             navigator.geolocation.getCurrentPosition(
                 position => {
                     tempParkingCoords = { lat: position.coords.latitude, lon: position.coords.longitude };
-                    resDiv.innerHTML = `<span style="color:var(--success);">Posizione fissata! (${tempParkingCoords.lat.toFixed(4)}, ${tempParkingCoords.lon.toFixed(4)})</span>`;
+                    resDiv.innerHTML = `<span style="color:var(--success);">Posizione fissata! (${tempParkingCoords.lat.toFixed(4)},${tempParkingCoords.lon.toFixed(4)})</span>`;
                     document.getElementById('parking-name-group').style.display = 'flex';
                 },
                 () => alert("Impossibile rilevare la posizione GPS"),
@@ -1175,7 +1129,6 @@
             updateKmPageUI();
         }
 
-        // --- GESTIONE SPESE & ALTRE FUNZIONI ---
         let currentExpenseType = '';
         let currentExpenseDesc = '';
 
@@ -1205,305 +1158,4 @@
                     <button class="keypad-btn" onclick="appendAmount('3')">3</button>
                     <button class="keypad-btn" onclick="appendAmount('4')">4</button>
                     <button class="keypad-btn" onclick="appendAmount('5')">5</button>
-                    <button class="keypad-btn" onclick="appendAmount('6')">6</button>
-                    <button class="keypad-btn" onclick="appendAmount('7')">7</button>
-                    <button class="keypad-btn" onclick="appendAmount('8')">8</button>
-                    <button class="keypad-btn" onclick="appendAmount('9')">9</button>
-                    <button class="keypad-btn" style="color: var(--danger)" onclick="clearAmount()">C</button>
-                    <button class="keypad-btn" onclick="appendAmount('0')">0</button>
-                    <button class="keypad-btn" onclick="appendAmount('00')">00</button>
-                </div>
-                <button class="btn btn-large" style="margin-top: 1rem;" onclick="submitExpenseAmount()">Conferma Spesa</button>
-            `);
-            updateAmountDisplay();
-        }
-
-        function saveExpenseDesc() {
-            const desc = document.getElementById('exp-desc').value;
-            if (!desc) return alert("Inserisci la descrizione");
-            currentExpenseDesc = desc;
-            openAmountModalForExpense(`Spesa ${currentExpenseType} (€)`);
-        }
-
-        function submitExpenseAmount() {
-            if (amountBuffer === '') return alert("Inserisci l'importo");
-            const amount = parseInt(amountBuffer, 10) / 100;
-            expenses.push({
-                id: Date.now(),
-                category: currentExpenseType,
-                amount: amount,
-                date: getCurrentDateTime().date,
-                description: currentExpenseDesc
-            });
-            localStorage.setItem('taxiExpenses', JSON.stringify(expenses));
-            closeModal();
-            switchSection('expenses');
-        }
-
-        function updateRidesList() {
-            const today = getCurrentDateTime().date;
-            const container = document.getElementById('rides-list');
-            if (!container) return;
-            container.innerHTML = '';
-
-            rides.filter(r => r.date === today).reverse().forEach(r => {
-                const item = document.createElement('div');
-                item.className = 'ride-item';
-                item.innerHTML = `
-                    <div class="ride-info">
-                        <div style="font-weight: 700;">${r.startTime ? r.startTime.time : ''} - ${r.endTime ? r.endTime.time : ''}</div>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">${r.departureAddress || ''} ➔ ${r.arrivalAddress || ''}</div>
-                        <div style="font-size: 0.75rem; color: var(--accent-primary);">⏱️ ${r.estimatedMinutes || 0} min | 🛣️ ${r.estimatedKm || 0} km (€${r.costPerKm || 0}/km)</div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted);">${r.pickupMode || ''} • ${r.paymentMode || ''}</div>
-                        ${r.nearestParking ? `<div style="font-size: 0.75rem; color: var(--success);">🅿️ ${r.nearestParking}</div>` : ''}
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.4rem;">
-                        <div class="ride-amount">€${r.amount ? r.amount.toFixed(2) : '0.00'}</div>
-                        <button class="edit-btn" onclick="openEditRideModal(${r.id})">Mod</button>
-                        <button class="delete-btn" onclick="deleteRide(${r.id})">X</button>
-                    </div>
-                `;
-                container.appendChild(item);
-            });
-        }
-
-        function deleteRide(id) {
-            if (!confirm('Eliminare corsa?')) return;
-            rides = rides.filter(r => r.id !== id);
-            localStorage.setItem('taxiRides', JSON.stringify(rides));
-            updateRidesList();
-            updateLastRideUI();
-            updatePrivacyTotalUI();
-        }
-
-        function updateExpensesList() {
-            const today = getCurrentDateTime().date;
-            const container = document.getElementById('expenses-list');
-            if (!container) return;
-            container.innerHTML = '';
-
-            expenses.filter(e => e.date === today).reverse().forEach(e => {
-                const item = document.createElement('div');
-                item.className = 'ride-item';
-                item.innerHTML = `
-                    <div class="ride-info">
-                        <div style="font-weight: 700;">${e.category}</div>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">${e.description || ''}</div>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                        <div class="ride-amount" style="color: var(--warning);">€${e.amount.toFixed(2)}</div>
-                        <button class="delete-btn" onclick="deleteExpense(${e.id})">X</button>
-                    </div>
-                `;
-                container.appendChild(item);
-            });
-        }
-
-        function deleteExpense(id) {
-            if (!confirm('Eliminare spesa?')) return;
-            expenses = expenses.filter(e => e.id !== id);
-            localStorage.setItem('taxiExpenses', JSON.stringify(expenses));
-            updateExpensesList();
-        }
-
-        function clearAllData() {
-            if (!confirm('Eliminare definitivamente tutti i dati?')) return;
-            localStorage.clear();
-            location.reload();
-        }
-
-        // --- GESTIONE SERVIZIO & KM ---
-        function openServiceModal() {
-            const activeShift = shifts.find(s => !s.endTime);
-            const lastShift = shifts.length > 0 ? shifts[shifts.length - 1] : null;
-            const lastKm = lastShift ? lastShift.endKm : 0;
-
-            if (!activeShift) {
-                modalBody.innerHTML = `
-                    <div class="modal-title">Inizio Servizio (KM)</div>
-                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; text-align: center;">KM Chiusura Turno Precedente: <strong>${lastKm} km</strong></div>
-                    <div class="input-group" style="margin-bottom: 1rem;">
-                        <input type="number" id="start-km-input" placeholder="KM Partenza" inputmode="numeric">
-                    </div>
-                    <button class="btn btn-large" onclick="startServiceSubmit(${lastKm})">Inizia Turno</button>
-                    <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="closeModal()">Annulla</button>
-                `;
-            } else {
-                modalBody.innerHTML = `
-                    <div class="modal-title">Fine Servizio (KM)</div>
-                    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; text-align: center;">KM Inizio Turno: <strong>${activeShift.startKm} km</strong></div>
-                    <div class="input-group" style="margin-bottom: 1rem;">
-                        <input type="number" id="end-km-input" placeholder="KM Arrivo" inputmode="numeric">
-                    </div>
-                    <button class="btn btn-large btn-danger" onclick="endServiceSubmit(${activeShift.startKm})">Termina Turno</button>
-                    <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="closeModal()">Annulla</button>
-                `;
-            }
-            modalOverlay.classList.add('active');
-        }
-
-        function startServiceSubmit(lastKm) {
-            const km = parseInt(document.getElementById('start-km-input').value, 10);
-            if (isNaN(km)) return alert("Inserisci i KM validi");
-            shifts.push({ id: Date.now(), startDate: getCurrentDateTime().date, startKm: km, endKm: null, drivenKm: 0 });
-            localStorage.setItem('taxiShifts', JSON.stringify(shifts));
-            closeModal();
-            updateServiceUI();
-        }
-
-        function endServiceSubmit(startKm) {
-            const km = parseInt(document.getElementById('end-km-input').value, 10);
-            if (isNaN(km)) return alert("Inserisci i KM validi");
-            if (km < startKm) {
-                return alert("I KM di arrivo non possono essere inferiori a quelli di partenza del turno!");
-            }
-            const driven = km - startKm;
-            shifts = shifts.map(s => {
-                if (!s.endTime) {
-                    s.endKm = km;
-                    s.drivenKm = driven;
-                    s.endTime = getCurrentDateTime().time;
-                }
-                return s;
-            });
-            localStorage.setItem('taxiShifts', JSON.stringify(shifts));
-            
-            maints.forEach(m => { m.lastKm += driven; });
-            localStorage.setItem('taxiMaints', JSON.stringify(maints));
-
-            closeModal();
-            updateServiceUI();
-            checkMaintenanceAlerts();
-        }
-
-        function updateServiceUI() {
-            const activeShift = shifts.find(s => !s.endTime);
-            const statusBox = document.getElementById('service-status-box');
-            const actionBtn = document.getElementById('service-action-btn');
-            const newRideBtn = document.getElementById('new-ride-btn');
-
-            if (activeShift) {
-                statusBox.innerHTML = `Stato: <strong style="color:var(--success);">In Servizio</strong> (Partenza: ${activeShift.startKm} km)`;
-                actionBtn.innerText = "Fine Servizio 🛑";
-                actionBtn.className = "btn btn-large btn-danger";
-                newRideBtn.style.opacity = "1";
-            } else {
-                statusBox.innerHTML = `Stato: <strong style="color:var(--text-muted);">Fuori Servizio</strong>`;
-                actionBtn.innerText = "Inizio Servizio 🟢";
-                actionBtn.className = "btn btn-large";
-                newRideBtn.style.opacity = "0.5";
-            }
-        }
-
-        function updateKmPageUI() {
-            const totalDriven = shifts.reduce((sum, s) => sum + (s.drivenKm || 0), 0);
-            document.getElementById('total-km-driven').innerText = `${totalDriven} km`;
-
-            const shiftsContainer = document.getElementById('shifts-list');
-            shiftsContainer.innerHTML = '';
-            shifts.slice(-5).reverse().forEach(s => {
-                const item = document.createElement('div');
-                item.className = 'ride-item';
-                item.innerHTML = `
-                    <div class="ride-info">
-                        <div style="font-weight: 700;">Data: ${s.startDate}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">Partenza: ${s.startKm} km | Arrivo: ${s.endKm || 'In corso'}</div>
-                    </div>
-                    <button class="edit-btn" onclick="openEditShiftModal(${s.id})">Modifica KM</button>
-                `;
-                shiftsContainer.appendChild(item);
-            });
-
-            // Lista parcheggi utente
-            const parkingContainer = document.getElementById('user-parking-list');
-            parkingContainer.innerHTML = '';
-            if (userParkings.length === 0) {
-                parkingContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center;">Nessun parcheggio personalizzato aggiunto.</div>';
-            } else {
-                userParkings.forEach(p => {
-                    const item = document.createElement('div');
-                    item.className = 'ride-item';
-                    item.innerHTML = `
-                        <div class="ride-info">
-                            <div style="font-weight: 700;">🅿️ ${p.name}</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted);">${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}</div>
-                        </div>
-                        <button class="delete-btn" onclick="deleteUserParking(${p.id})">Elimina</button>
-                    `;
-                    parkingContainer.appendChild(item);
-                });
-            }
-
-            const container = document.getElementById('maintenance-list');
-            container.innerHTML = '';
-            maints.forEach(m => {
-                const kmLeft = m.intervalKm - (m.lastKm % m.intervalKm);
-                const item = document.createElement('div');
-                item.className = 'ride-item';
-                item.innerHTML = `
-                    <div class="ride-info">
-                        <div style="font-weight: 700;">${m.name}</div>
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">Intervallo: ogni ${m.intervalKm} km</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="font-size: 0.9rem; font-weight: 700; color: ${kmLeft < 500 ? 'var(--danger)' : 'var(--success)'};">Mancano ${kmLeft} km</div>
-                        <button class="delete-btn" style="margin-top:0.3rem;" onclick="deleteMaint(${m.id})">Elimina</button>
-                    </div>
-                `;
-                container.appendChild(item);
-            });
-
-            const ctx = document.getElementById('kmChart');
-            if (!ctx) return;
-            if (kmChartInstance) kmChartInstance.destroy();
-
-            const lastDays = shifts.slice(-7);
-            kmChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: lastDays.map(s => s.startDate),
-                    datasets: [{
-                        label: 'KM Percorsi',
-                        data: lastDays.map(s => s.drivenKm),
-                        backgroundColor: '#3b82f6',
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                        x: { ticks: { color: '#f8fafc' }, grid: { display: false } }
-                    }
-                }
-            });
-        }
-
-        let editingShiftId = null;
-        function openEditShiftModal(id) {
-            const shift = shifts.find(s => s.id === id);
-            if (!shift) return;
-            editingShiftId = id;
-            modalBody.innerHTML = `
-                <div class="modal-title">Modifica KM Turno</div>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <div>
-                        <label style="font-size:0.75rem; color:var(--text-muted);">KM Partenza:</label>
-                        <input type="number" id="edit-start-km" value="${shift.startKm}" inputmode="numeric">
-                    </div>
-                    <div>
-                        <label style="font-size:0.75rem; color:var(--text-muted);">KM Arrivo:</label>
-                        <input type="number" id="edit-end-km" value="${shift.endKm || 0}" inputmode="numeric">
-                    </div>
-                    <button class="btn btn-large" onclick="saveShiftKm()">Salva Nuovi KM</button>
-                    <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
-                </div>
-            `;
-            modalOverlay.classList.add('active');
-        }
-
-        function saveShiftKm() {
-            const newStart = parseInt(document.getElementById('edit-start-km').value, 10);
-            const newEnd = parseInt(
+                    <button class="keypad-btn" onclick
