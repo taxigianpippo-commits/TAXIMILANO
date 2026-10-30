@@ -32,7 +32,7 @@
         }
 
         body {
-            background-color: var(--bg-body);
+            background-color: var--bg-body;
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
@@ -42,7 +42,7 @@
 
         header {
             background: #0f172a;
-            padding: 1rem;
+            padding: 0.8rem;
             text-align: center;
             border-bottom: 1px solid var(--border-card);
             position: sticky;
@@ -51,9 +51,41 @@
         }
 
         header h1 {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             font-weight: 700;
             color: #60a5fa;
+        }
+
+        /* Tab di navigazione ingranditi su due righe */
+        .nav-tabs {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            background: #0f172a;
+            padding: 0.4rem;
+            gap: 0.3rem;
+            position: sticky;
+            top: 48px;
+            z-index: 9;
+            border-bottom: 1px solid var(--border-card);
+        }
+
+        .tab-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-card);
+            color: var(--text-muted);
+            padding: 0.6rem 0.2rem;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .tab-btn.active {
+            background: var(--accent-primary);
+            color: #ffffff;
+            border-color: var(--accent-primary);
         }
 
         main {
@@ -63,38 +95,6 @@
             margin: 0 auto;
             width: 100%;
             padding-bottom: 90px;
-        }
-
-        .nav-tabs {
-            display: flex;
-            background: #0f172a;
-            border-radius: var(--radius-md);
-            padding: 0.3rem;
-            margin-bottom: 1rem;
-            gap: 0.2rem;
-            position: sticky;
-            top: 60px;
-            z-index: 9;
-            border: 1px solid var(--border-card);
-            overflow-x: auto;
-        }
-
-        .tab-btn {
-            background: none;
-            border: none;
-            color: var(--text-muted);
-            padding: 0.6rem 0.4rem;
-            border-radius: var(--radius-sm);
-            font-weight: 600;
-            font-size: 0.7rem;
-            cursor: pointer;
-            flex: 1;
-            white-space: nowrap;
-        }
-
-        .tab-btn.active {
-            background: var(--accent-primary);
-            color: #ffffff;
         }
 
         .section {
@@ -214,12 +214,6 @@
             border-radius: 12px;
             font-size: 0.75rem;
             font-weight: 600;
-        }
-
-        .badge-parking {
-            background: rgba(16, 185, 129, 0.2);
-            color: #34d399;
-            border: 1px solid rgba(16, 185, 129, 0.3);
         }
 
         .badge-mode {
@@ -394,6 +388,7 @@
         <h1>🚖 APP-TAXI GALBO' 🚖</h1>
     </header>
 
+    <!-- Tab di navigazione su due righe e ingranditi -->
     <div class="nav-tabs">
         <button class="tab-btn active" onclick="switchSection('rides')">Corsa</button>
         <button class="tab-btn" onclick="switchSection('history')">Storico</button>
@@ -401,7 +396,7 @@
         <button class="tab-btn" onclick="switchSection('stats')">Stats</button>
         <button class="tab-btn" onclick="switchSection('expenses')">Spese</button>
         <button class="tab-btn" onclick="switchSection('km-page')">KM & Tagliandi</button>
-        <button class="tab-btn" onclick="switchSection('settings')">Altro</button>
+        <button class="tab-btn" onclick="switchSection('settings')" style="grid-column: span 2;">Altro</button>
     </div>
 
     <main>
@@ -416,6 +411,7 @@
 
             <button id="new-ride-btn" class="btn btn-large" style="opacity: 0.5;" onclick="checkAndOpenStartRide()">Inizio Corsa</button>
 
+            <!-- Ultima Corsa sempre in visione nella prima pagina -->
             <div id="last-ride-card" class="card" style="margin-top: 1.5rem; display: none;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
                     <h3 style="font-size: 0.95rem; color: var(--accent-primary); font-weight: 700;">ULTIMA CORSA</h3>
@@ -620,6 +616,7 @@
             checkMaintenanceAlerts();
             updateServiceUI();
             updatePrivacyTotalUI();
+            updateLastRideUI();
 
             window.addEventListener('popstate', (e) => {
                 const conf = confirm("Vuoi uscire dall'applicazione?");
@@ -697,6 +694,31 @@
             }
         }
 
+        function updateLastRideUI() {
+            const lastRideCard = document.getElementById('last-ride-card');
+            const detailsDiv = document.getElementById('last-ride-details');
+            const timeBadge = document.getElementById('last-ride-time-badge');
+
+            if (!lastRideCard || rides.length === 0) {
+                if (lastRideCard) lastRideCard.style.display = 'none';
+                return;
+            }
+
+            const last = rides[rides.length - 1];
+            lastRideCard.style.display = 'block';
+            if (timeBadge) timeBadge.innerText = `${last.startTime ? last.startTime.time : ''} - ${last.endTime ? last.endTime.time : ''}`;
+
+            if (detailsDiv) {
+                detailsDiv.innerHTML = `
+                    <div style="font-weight: 700; font-size: 1.1rem; color: var(--success); margin-bottom: 0.4rem;">€${last.amount ? last.amount.toFixed(2) : '0.00'}</div>
+                    <div style="font-size: 0.9rem; color: var(--text-main); margin-bottom: 0.2rem;">${last.departureAddress || ''} ➔ ${last.arrivalAddress || ''}</div>
+                    <div style="font-size: 0.8rem; color: var(--accent-primary);">⏱️ Tempo: <strong>${last.estimatedMinutes || 0} min</strong> (€${last.costPerMin || 0}/min) | 🛣️ Distanza: <strong>${last.estimatedKm || 0} km</strong> (€${last.costPerKm || 0}/km)</div>
+                    <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">${last.pickupMode || ''} • ${last.paymentMode || ''}</div>
+                    ${last.nearestParking ? `<div style="font-size: 0.75rem; color: var(--success); margin-top: 0.2rem;">🅿️ ${last.nearestParking}</div>` : ''}
+                `;
+            }
+        }
+
         function getCurrentDateTime() {
             const now = new Date();
             let hours = now.getHours();
@@ -723,7 +745,7 @@
                 <button class="btn btn-large" onclick="captureDepartureGPS()">Geolocalizza Posizione GPS</button>
                 <div id="gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
                 <div class="input-group" style="margin-top: 0.75rem;">
-                    <input type="text" id="manual-departure" placeholder="Oppure inserisci via manualmente">
+                    <input type="text" id="manual-departure" placeholder="Es. Piazza del Duomo, Milano">
                     <button class="btn" style="width: auto;" onclick="submitManualDeparture()">OK</button>
                 </div>
                 <button class="btn btn-secondary btn-danger" style="margin-top:1.5rem;" onclick="cancelRideProcess()">Annulla Corsa</button>
@@ -769,25 +791,28 @@
                         .then(response => response.json())
                         .then(data => {
                             let via = "";
+                            let city = "Milano";
                             if (data && data.address) {
                                 via = data.address.road || data.address.pedestrian || data.address.street || data.address.suburb || "";
+                                city = data.address.city || data.address.town || data.address.village || "Milano";
                             }
                             if (!via && data && data.display_name) {
                                 via = data.display_name.split(',')[0];
                             }
                             via = via.replace(/[0-9]/g, '').trim() || "Milano Centro";
-                            callback(via, coords, nearestParking);
+                            let fullAddress = `${via}, ${city}`;
+                            callback(fullAddress, coords, nearestParking);
                         })
-                        .catch(() => callback("Milano Centro", coords, nearestParking));
+                        .catch(() => callback("Milano Centro, Milano", coords, nearestParking));
                 },
-                () => callback("Milano Centro", {lat: 45.4641, lon: 9.1919}, null),
+                () => callback("Milano Centro, Milano", {lat: 45.4641, lon: 9.1919}, null),
                 { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
             );
         }
 
         function captureDepartureGPS() {
-            fetchRealGPS((street, coords, nearestParking) => {
-                currentDetectedStreet = street;
+            fetchRealGPS((address, coords, nearestParking) => {
+                currentDetectedStreet = address;
                 currentDepCoords = coords;
                 currentRide.nearestParking = nearestParking;
                 const gpsResultDiv = document.getElementById('gps-result');
@@ -795,12 +820,12 @@
                     gpsResultDiv.style.display = 'block';
                     gpsResultDiv.innerHTML = `
                         <div style="font-size: 0.8rem; color: var(--text-muted);">Indirizzo rilevato:</div>
-                        <div style="font-size: 1rem; font-weight:700; margin-top:0.2rem;">${street}</div>
+                        <div style="font-size: 1rem; font-weight:700; margin-top:0.2rem;">${address}</div>
                         ${nearestParking ? `<div style="font-size: 0.8rem; color: var(--success); margin-top:0.2rem;">🅿️ Vicino a: <strong>${nearestParking}</strong></div>` : ''}
                     `;
                 }
                 const inputManual = document.getElementById('manual-departure');
-                if (inputManual) inputManual.value = street;
+                if (inputManual) inputManual.value = address;
 
                 const modalContent = modalBody.querySelector('.modal-content');
                 if (modalContent && !document.getElementById('gps-ok-btn')) {
@@ -819,8 +844,11 @@
         }
 
         function submitManualDeparture() {
-            const val = document.getElementById('manual-departure').value;
-            if (!val) return alert("Inserisci una via");
+            let val = document.getElementById('manual-departure').value;
+            if (!val) return alert("Inserisci un indirizzo");
+            if (!val.toLowerCase().includes('milano')) {
+                val += ", Milano";
+            }
             currentRide.departureAddress = val;
             currentRide.nearestParking = "Manuale";
             currentDepCoords = {lat: 45.4641, lon: 9.1919};
@@ -1032,7 +1060,7 @@
                 <button class="btn btn-large" onclick="captureArrivalGPS()">Rileva Posizione Arrivo</button>
                 <div id="gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
                 <div class="input-group" style="margin-top: 0.75rem;">
-                    <input type="text" id="manual-arrival" placeholder="Oppure via manuale">
+                    <input type="text" id="manual-arrival" placeholder="Es. Stazione Centrale, Milano">
                     <button class="btn" style="width: auto;" onclick="submitManualArrival()">OK</button>
                 </div>
                 <div style="display:flex; gap:0.5rem; margin-top:1rem;">
@@ -1043,16 +1071,16 @@
         }
 
         function captureArrivalGPS() {
-            fetchRealGPS((street, coords) => {
-                currentDetectedStreet = street;
+            fetchRealGPS((address, coords) => {
+                currentDetectedStreet = address;
                 currentArrCoords = coords;
                 const gpsResultDiv = document.getElementById('gps-result');
                 if (gpsResultDiv) {
                     gpsResultDiv.style.display = 'block';
-                    gpsResultDiv.innerHTML = `<div style="font-size:0.8rem; color:var(--text-muted);">Arrivo:</div><div style="font-size:1rem; font-weight:700;">${street}</div>`;
+                    gpsResultDiv.innerHTML = `<div style="font-size:0.8rem; color:var(--text-muted);">Arrivo:</div><div style="font-size:1rem; font-weight:700;">${address}</div>`;
                 }
                 const inputManual = document.getElementById('manual-arrival');
-                if (inputManual) inputManual.value = street;
+                if (inputManual) inputManual.value = address;
 
                 const modalContent = modalBody.querySelector('.modal-content');
                 if (modalContent && !document.getElementById('gps-ok-btn')) {
@@ -1071,8 +1099,11 @@
         }
 
         function submitManualArrival() {
-            const val = document.getElementById('manual-arrival').value;
-            if (!val) return alert("Inserisci una via");
+            let val = document.getElementById('manual-arrival').value;
+            if (!val) return alert("Inserisci un indirizzo");
+            if (!val.toLowerCase().includes('milano')) {
+                val += ", Milano";
+            }
             currentRide.arrivalAddress = val;
             currentArrCoords = {lat: 45.4700, lon: 9.1800};
             openEndTimeModal();
@@ -1086,13 +1117,24 @@
         }
 
         function finalizeRide() {
+            // Calcolo minuti effettivi basati su orario partenza e arrivo
+            let estMinutes = 10;
+            if (currentRide.startTime && currentRide.endTime) {
+                const [hStart, mStart] = currentRide.startTime.time.split(':').map(Number);
+                const [hEnd, mEnd] = currentRide.endTime.time.split(':').map(Number);
+                let diff = (hEnd * 60 + mEnd) - (hStart * 60 + mStart);
+                if (diff < 0) diff += 24 * 60; // gestione cambio giorno
+                estMinutes = Math.max(1, diff);
+            }
+
+            // Calcolo stima KM basata su mappe (approssimazione coordinate o ricerca stringa)
             let distKm = 3.5;
             if (currentDepCoords && currentArrCoords) {
                 let dLat = currentArrCoords.lat - currentDepCoords.lat;
                 let dLon = currentArrCoords.lon - currentDepCoords.lon;
                 distKm = Math.max(1.0, Math.round(Math.sqrt(dLat*dLat + dLon*dLon) * 111 * 10) / 10);
             }
-            let estMinutes = Math.max(5, Math.round(distKm * 3.5));
+
             let costPerMin = estMinutes > 0 ? (currentRide.amount / estMinutes).toFixed(2) : '0.00';
             let costPerKm = distKm > 0 ? (currentRide.amount / distKm).toFixed(2) : '0.00';
 
@@ -1109,6 +1151,7 @@
             closeModal();
             switchSection('rides');
             updatePrivacyTotalUI();
+            updateLastRideUI();
         }
 
         function openAddParkingModal() {
@@ -1240,13 +1283,12 @@
                     <div class="ride-info">
                         <div style="font-weight: 700;">${r.startTime ? r.startTime.time : ''} - ${r.endTime ? r.endTime.time : ''}</div>
                         <div style="font-size: 0.85rem; color: var(--text-muted);">${r.departureAddress || ''} ➔ ${r.arrivalAddress || ''}</div>
-                        <div style="font-size: 0.75rem; color: var(--accent-primary);">⏱️ ${r.estimatedMinutes || 0} min | 🛣️ ${r.estimatedKm || 0} km (€${r.costPerKm || 0}/km)</div>
+                        <div style="font-size: 0.75rem; color: var(--accent-primary);">⏱️ ${r.estimatedMinutes || 0} min (€${r.costPerMin || 0}/min) | 🛣️ ${r.estimatedKm || 0} km (€${r.costPerKm || 0}/km)</div>
                         <div style="font-size: 0.75rem; color: var(--text-muted);">${r.pickupMode || ''} • ${r.paymentMode || ''}</div>
                         ${r.nearestParking ? `<div style="font-size: 0.75rem; color: var(--success);">🅿️ ${r.nearestParking}</div>` : ''}
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.4rem;">
                         <div class="ride-amount">€${r.amount ? r.amount.toFixed(2) : '0.00'}</div>
-                        <button class="edit-btn" onclick="openEditRideModal(${r.id})">Mod</button>
                         <button class="delete-btn" onclick="deleteRide(${r.id})">X</button>
                     </div>
                 `;
@@ -1933,4 +1975,5 @@
             document.getElementById('obj-percentage').innerText = `${percentage.toFixed(1)}% raggiunto`;
         }
     </script>
+</body>
 </html>
