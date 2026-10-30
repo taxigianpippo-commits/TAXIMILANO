@@ -56,7 +56,6 @@
             color: #60a5fa;
         }
 
-        /* Tab di navigazione colorati e disposti su due righe (4 in alto, 4 in basso) */
         .nav-tabs {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -89,7 +88,6 @@
             box-shadow: 0 0 10px rgba(255,255,255,0.2);
         }
 
-        /* Colori distintivi per ogni tab (inclusi Export e Tariffe Fisse) */
         .tab-rides { background: #3b82f6; }
         .tab-history { background: #8b5cf6; }
         .tab-summary { background: #10b981; }
@@ -424,7 +422,6 @@
         <h1>🚖 APP-TAXI GALBO' 🚖</h1>
     </header>
 
-    <!-- 8 Tab di navigazione distribuiti su due righe uniformi (4 per riga) -->
     <div class="nav-tabs">
         <button class="tab-btn tab-rides active" onclick="switchSection('rides')">Corsa</button>
         <button class="tab-btn tab-history" onclick="switchSection('history')">Storico</button>
@@ -561,6 +558,13 @@
             <button class="btn btn-secondary" onclick="openExpenseModal('Benzina')">Registra Benzina</button>
             <button class="btn btn-secondary" onclick="openExpenseModal('Casello')">Registra Casello</button>
             <button class="btn btn-secondary" onclick="openExpenseModal('Manutenzione')">Registra Manutenzione</button>
+            
+            <!-- Riepilogo Spese per Benzina, Caselli, Manutenzione (Giorno, Settimana, Mese, Anno) -->
+            <div class="card" style="margin-top: 1rem; border-color: var(--danger);">
+                <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--danger);">Riepilogo Spese (Benzina, Caselli, Manutenzione)</h3>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;" id="expenses-summary-container"></div>
+            </div>
+
             <h2 style="margin: 1.2rem 0 0.75rem; font-size: 1rem; color: var(--text-muted);">Spese di Oggi</h2>
             <div id="expenses-list" class="rides-list"></div>
         </section>
@@ -595,7 +599,6 @@
             </div>
         </section>
 
-        <!-- Sezione Tariffe Fisse dedicata (Tab in alto) -->
         <section id="rates-page-section" class="section">
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -809,7 +812,7 @@
             }
             currentRide = {};
             editingRideId = null;
-            openStartTimeModal(); // Chiede prima l'orario di partenza
+            openStartTimeModal();
         }
 
         function openStartTimeModal() {
@@ -875,7 +878,7 @@
             
             if (timeTargetField === 'startTime') {
                 currentRide.startTime = { time: formattedTime, date: getCurrentDateTime().date };
-                openDepartureGPSModal(); // Poi chiede la geolocalizzazione partenza
+                openDepartureGPSModal();
             } else if (timeTargetField === 'endTime') {
                 currentRide.endTime = { time: formattedTime, date: getCurrentDateTime().date };
                 finalizeRide();
@@ -1295,7 +1298,35 @@
 
         function saveNewParking() {
             const name = document.getElementById('new-parking-name').value;
-            if (!name || !tempParkingCoords) return alert("Inserisci il nome e rileva la posizione");
+            if (!name) return alert("Inserisci il nome del parcheggio");
+            if (!tempParkingCoords) tempParkingCoords = { lat: 45.4641, lon: 9.1919 }; // fallback default se inserito manualmente senza GPS
+
+            // Controllo duplicati per nome o vicinanza coordinate (~100 metri)
+            let allExisting = [...userParkings, ...defaultTaxiParkingMilano];
+            let isDuplicate = false;
+            let duplicateReason = "";
+
+            for (let p of allExisting) {
+                let nameMatch = p.name.toLowerCase().trim() === name.toLowerCase().trim() || 
+                                p.name.toLowerCase().includes(name.toLowerCase().trim()) || 
+                                name.toLowerCase().includes(p.name.toLowerCase().trim());
+                
+                let dist = Math.sqrt(Math.pow(p.lat - tempParkingCoords.lat, 2) + Math.pow(p.lon - tempParkingCoords.lon, 2));
+                let coordMatch = dist < 0.001; // circa 100 metri
+
+                if (nameMatch || coordMatch) {
+                    isDuplicate = true;
+                    duplicateReason = nameMatch ? `Nome simile a "${p.name}"` : `Posizione vicina a "${p.name}"`;
+                    break;
+                }
+            }
+
+            if (isDuplicate) {
+                if (!confirm(`⚠️ Attenzione: Questo parcheggio sembra già esistere (${duplicateReason}). Vuoi aggiungerlo comunque?`)) {
+                    return;
+                }
+            }
+
             userParkings.push({ id: Date.now(), name, lat: tempParkingCoords.lat, lon: tempParkingCoords.lon });
             localStorage.setItem('taxiUserParkings', JSON.stringify(userParkings));
             closeModal();
@@ -1429,6 +1460,52 @@
                 `;
                 container.appendChild(item);
             });
+
+            // Calcolo e visualizzazione del riepilogo spese (Benzina, Caselli, Manutenzione) x giorno, settimana, mese, anno
+            const summaryContainer = document.getElementById('expenses-summary-container');
+            if (summaryContainer) {
+                const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString().split('T')[0];
+                const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+                const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
+
+                let calcExp = (cat, filterFunc) => expenses.filter(e => e.category === cat && filterFunc(e.date)).reduce((sum, e) => sum + e.amount, 0);
+
+                let benzDay = calcExp('Benzina', d => d === today);
+                let benzWeek = calcExp('Benzina', d => d >= startOfWeek);
+                let benzMonth = calcExp('Benzina', d => d >= startOfMonth);
+                let benzYear = calcExp('Benzina', d => d >= startOfYear);
+
+                let casDay = calcExp('Casello', d => d === today);
+                let casWeek = calcExp('Casello', d => d >= startOfWeek);
+                let casMonth = calcExp('Casello', d => d >= startOfMonth);
+                let casYear = calcExp('Casello', d => d >= startOfYear);
+
+                let mantDay = calcExp('Manutenzione', d => d === today);
+                let mantWeek = calcExp('Manutenzione', d => d >= startOfWeek);
+                let mantMonth = calcExp('Manutenzione', d => d >= startOfMonth);
+                let mantYear = calcExp('Manutenzione', d => d >= startOfYear);
+
+                summaryContainer.innerHTML = `
+                    <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
+                        <div style="font-weight: 700; color: var(--accent-primary); margin-bottom: 0.3rem;">⛽ Benzina</div>
+                        <div style="display: flex; justify-content: space-between; font-size:0.75rem; color:var(--text-muted);">
+                            <span>Oggi: €${benzDay.toFixed(2)}</span><span>Settimana: €${benzWeek.toFixed(2)}</span><span>Mese: €${benzMonth.toFixed(2)}</span><span>Anno: €${benzYear.toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
+                        <div style="font-weight: 700; color: var(--warning); margin-bottom: 0.3rem;">🛣️ Caselli</div>
+                        <div style="display: flex; justify-content: space-between; font-size:0.75rem; color:var(--text-muted);">
+                            <span>Oggi: €${casDay.toFixed(2)}</span><span>Settimana: €${casWeek.toFixed(2)}</span><span>Mese: €${casMonth.toFixed(2)}</span><span>Anno: €${casYear.toFixed(2)}</span>
+                        </div>
+                    </div>
+                    <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
+                        <div style="font-weight: 700; color: var(--success); margin-bottom: 0.3rem;">🔧 Manutenzione</div>
+                        <div style="display: flex; justify-content: space-between; font-size:0.75rem; color:var(--text-muted);">
+                            <span>Oggi: €${mantDay.toFixed(2)}</span><span>Settimana: €${mantWeek.toFixed(2)}</span><span>Mese: €${mantMonth.toFixed(2)}</span><span>Anno: €${mantYear.toFixed(2)}</span>
+                        </div>
+                    </div>
+                `;
+            }
         }
 
         function deleteExpense(id) {
@@ -2025,8 +2102,9 @@
             return false;
         }
 
+        // Calcolo Medie Corretto: Somma Incassi diviso Somma Minuti / Somma KM
         function calculateAverages() {
-            let totalMin = 0, totalKmVal = 0, totalAmt = 0;
+            let totalMin = 0, totalKm = 0, totalAmt = 0;
             let ferialeMin = 0, ferialeKm = 0, ferialeAmt = 0;
             let notteMin = 0, notteKm = 0, notteAmt = 0;
             let festivoMin = 0, festivoKm = 0, festivoAmt = 0;
@@ -2037,7 +2115,7 @@
                 const km = r.estimatedKm || 0;
 
                 totalMin += min;
-                totalKmVal += km;
+                totalKm += km;
                 totalAmt += amt;
 
                 let hour = 10;
@@ -2065,7 +2143,7 @@
             return {
                 global: {
                     min: totalMin > 0 ? (totalAmt / totalMin).toFixed(2) : '0.00',
-                    km: totalKmVal > 0 ? (totalAmt / totalKmVal).toFixed(2) : '0.00'
+                    km: totalKm > 0 ? (totalAmt / totalKm).toFixed(2) : '0.00'
                 },
                 feriale: {
                     min: ferialeMin > 0 ? (ferialeAmt / ferialeMin).toFixed(2) : '0.00',
