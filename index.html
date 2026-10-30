@@ -32,7 +32,7 @@
         }
 
         body {
-            background-color: var--bg-body;
+            background-color: var(--bg-body);
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
@@ -56,7 +56,7 @@
             color: #60a5fa;
         }
 
-        /* Tab di navigazione colorati e ingranditi su due righe */
+        /* Tab di navigazione colorati e disposti su due righe (4 in alto, 4 in basso) */
         .nav-tabs {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -75,7 +75,7 @@
             padding: 0.6rem 0.2rem;
             border-radius: var(--radius-sm);
             font-weight: 700;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             cursor: pointer;
             text-align: center;
             white-space: nowrap;
@@ -89,14 +89,15 @@
             box-shadow: 0 0 10px rgba(255,255,255,0.2);
         }
 
-        /* Colori distintivi per ogni tab */
+        /* Colori distintivi per ogni tab (inclusi Export e Tariffe Fisse) */
         .tab-rides { background: #3b82f6; }
         .tab-history { background: #8b5cf6; }
         .tab-summary { background: #10b981; }
         .tab-stats { background: #f59e0b; }
         .tab-expenses { background: #ef4444; }
         .tab-km { background: #06b6d4; }
-        .tab-settings { background: #64748b; grid-column: span 2; }
+        .tab-export { background: #64748b; }
+        .tab-rates { background: #d97706; }
 
         main {
             flex: 1;
@@ -423,14 +424,16 @@
         <h1>🚖 APP-TAXI GALBO' 🚖</h1>
     </header>
 
+    <!-- 8 Tab di navigazione distribuiti su due righe uniformi (4 per riga) -->
     <div class="nav-tabs">
         <button class="tab-btn tab-rides active" onclick="switchSection('rides')">Corsa</button>
         <button class="tab-btn tab-history" onclick="switchSection('history')">Storico</button>
         <button class="tab-btn tab-summary" onclick="switchSection('summary')">Totali</button>
         <button class="tab-btn tab-stats" onclick="switchSection('stats')">Stats</button>
         <button class="tab-btn tab-expenses" onclick="switchSection('expenses')">Spese</button>
-        <button class="tab-btn tab-km" onclick="switchSection('km-page')">KM & Tagliandi</button>
-        <button class="tab-btn tab-settings" onclick="switchSection('settings')">Altro</button>
+        <button class="tab-btn tab-km" onclick="switchSection('km-page')">KM & Tagl.</button>
+        <button class="tab-btn tab-export" onclick="switchSection('settings')">Export</button>
+        <button class="tab-btn tab-rates" onclick="switchSection('rates-page')">Tariffe Fisse</button>
     </div>
 
     <main>
@@ -471,7 +474,6 @@
                 </div>
             </div>
             
-            <!-- Medie Globali e per Fasce Tariffarie -->
             <div class="card" style="border-color: var(--success);">
                 <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--success);">Medie Globali & Fasce Tariffarie</h3>
                 <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
@@ -593,11 +595,19 @@
             </div>
         </section>
 
-        <section id="settings-section" class="section">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
-                <button class="btn btn-secondary" style="margin-top:0; font-size:0.9rem;" onclick="exportDataExcelModal()">Esporta Excel</button>
-                <button class="btn btn-secondary" style="margin-top:0; font-size:0.9rem; border-color:var(--success); color:var(--success);" onclick="openFixedRatesModal()">Tariffe Fisse</button>
+        <!-- Sezione Tariffe Fisse dedicata (Tab in alto) -->
+        <section id="rates-page-section" class="section">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="font-size: 1rem; color: var(--warning);">Tariffe Fisse Ufficiali</h3>
+                    <button class="btn btn-secondary" style="margin-top:0; width:auto; padding: 0.4rem 0.8rem; font-size:0.8rem;" onclick="toggleInvertRates()">🔄 Inverti Tratte</button>
+                </div>
+                <div id="fixed-rates-container" class="rides-list"></div>
             </div>
+        </section>
+
+        <section id="settings-section" class="section">
+            <button class="btn btn-secondary" onclick="exportDataExcelModal()">Esporta Excel (Personalizzato)</button>
             <button class="btn btn-secondary" onclick="backupData()">Backup Dati (JSON)</button>
             <button class="btn btn-secondary" style="border-color: rgba(239, 68, 68, 0.4);" onclick="restoreData()">Ripristina Dati</button>
             <input type="file" id="restore-file" style="display: none;" accept=".json" onchange="handleRestore(event)">
@@ -658,6 +668,7 @@
         let kmChartInstance = null;
         let currentPickupPeriod = 'day';
         let privacyHidden = false;
+        let ratesInverted = false;
 
         let rides = JSON.parse(localStorage.getItem('taxiRides')) || [];
         let expenses = JSON.parse(localStorage.getItem('taxiExpenses')) || [];
@@ -676,6 +687,7 @@
             updateServiceUI();
             updatePrivacyTotalUI();
             updateLastRideUI();
+            renderFixedRatesList();
 
             window.addEventListener('popstate', (e) => {
                 const conf = confirm("Vuoi uscire dall'applicazione?");
@@ -690,7 +702,7 @@
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             document.querySelectorAll('.section').forEach(section => section.classList.remove('active'));
             
-            const tabs = ['rides', 'history', 'summary', 'stats', 'expenses', 'km-page', 'settings'];
+            const tabs = ['rides', 'history', 'summary', 'stats', 'expenses', 'km-page', 'settings', 'rates-page'];
             const btnIndex = tabs.indexOf(sectionId);
             if (btnIndex !== -1) {
                 document.querySelectorAll('.tab-btn')[btnIndex].classList.add('active');
@@ -707,6 +719,7 @@
             if (sectionId === 'history') updateRidesList();
             if (sectionId === 'expenses') updateExpensesList();
             if (sectionId === 'km-page') updateKmPageUI();
+            if (sectionId === 'rates-page') renderFixedRatesList();
             updatePrivacyTotalUI();
         }
 
@@ -796,10 +809,9 @@
             }
             currentRide = {};
             editingRideId = null;
-            openStartTimeModal(); // Invertito: prima l'orario di partenza
+            openStartTimeModal(); // Chiede prima l'orario di partenza
         }
 
-        // 1. Prima chiediamo l'orario di partenza
         function openStartTimeModal() {
             const now = new Date();
             timeBuffer = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
@@ -863,14 +875,13 @@
             
             if (timeTargetField === 'startTime') {
                 currentRide.startTime = { time: formattedTime, date: getCurrentDateTime().date };
-                openDepartureGPSModal(); // Passa alla geolocalizzazione partenza
+                openDepartureGPSModal(); // Poi chiede la geolocalizzazione partenza
             } else if (timeTargetField === 'endTime') {
                 currentRide.endTime = { time: formattedTime, date: getCurrentDateTime().date };
                 finalizeRide();
             }
         }
 
-        // 2. Poi chiediamo la geolocalizzazione della partenza
         function openDepartureGPSModal() {
             openModalContent('Indirizzo Partenza', `
                 <button class="btn btn-large" onclick="captureDepartureGPS()">Geolocalizza Posizione GPS</button>
@@ -1216,33 +1227,34 @@
             updateLastRideUI();
         }
 
-        // Funzione Tariffe Fisse
-        function openFixedRatesModal(inverted = false) {
-            let listHtml = '';
-            fixedRatesList.forEach((item, idx) => {
+        function toggleInvertRates() {
+            ratesInverted = !ratesInverted;
+            renderFixedRatesList();
+        }
+
+        function renderFixedRatesList() {
+            const container = document.getElementById('fixed-rates-container');
+            if (!container) return;
+            container.innerHTML = '';
+
+            fixedRatesList.forEach(item => {
                 let displayTratta = item.tratta;
-                if (inverted) {
+                if (ratesInverted) {
                     let parts = item.tratta.split('-');
                     if (parts.length === 2) {
                         displayTratta = parts[1].trim() + " - " + parts[0].trim();
                     }
                 }
-                listHtml += `
-                    <div class="ride-item" style="margin-bottom:0.5rem;">
-                        <div class="ride-info">
-                            <div style="font-weight: 700; font-size:0.9rem;">${displayTratta}</div>
-                        </div>
-                        <div class="ride-amount" style="font-size:1.1rem;">€${item.prezzo}</div>
+                const div = document.createElement('div');
+                div.className = 'ride-item';
+                div.innerHTML = `
+                    <div class="ride-info">
+                        <div style="font-weight: 700; font-size:0.95rem;">${displayTratta}</div>
                     </div>
+                    <div class="ride-amount" style="font-size:1.15rem;">€${item.prezzo}</div>
                 `;
+                container.appendChild(div);
             });
-
-            const nextInvert = !inverted;
-            openModalContent('Tariffe Fisse Taxi', `
-                <button class="btn btn-secondary" style="margin-bottom:1rem; font-size:0.85rem;" onclick="openFixedRatesModal(${nextInvert})">🔄 Inverti Tratte</button>
-                <div style="max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem;">${listHtml}</div>
-                <button class="btn btn-secondary" style="margin-top:1rem;" onclick="closeModal()">Chiudi</button>
-            `);
         }
 
         function openAddParkingModal() {
@@ -2001,38 +2013,23 @@
             });
         }
 
-        // Funzione per verificare se una data è festiva (es. feste fisse italiane + calcolo pasqua o simili)
         function isHolidayOrSunday(dateStr) {
             const d = new Date(dateStr);
-            const dayOfWeek = d.getDay(); // 0 = Domenica
+            const dayOfWeek = d.getDay();
             if (dayOfWeek === 0) return true;
 
             const day = d.getDate();
-            const month = d.getMonth() + 1; // 1-12
-            // Festività fisse italiane
-            const fixedHolidays = [
-                "1-1",   // Capodanno
-                "6-1",   // Epifania
-                "25-4",  // Liberazione
-                "1-5",   // Festa Lavoro
-                "2-6",   // Festa Repubblica
-                "15-8",  // Ferragosto
-                "1-11",  // Ognissanti
-                "8-12",  // Immacolata
-                "25-12", // Natale
-                "26-12"  // S.Stefano
-            ];
+            const month = d.getMonth() + 1;
+            const fixedHolidays = ["1-1", "6-1", "25-4", "1-5", "2-6", "15-8", "1-11", "8-12", "25-12", "26-12"];
             if (fixedHolidays.includes(`${day}-${month}`)) return true;
             return false;
         }
 
-        // Calcolo delle medie suddivise per fasce e globale
         function calculateAverages() {
-            let totalMin = 0, totalKmVal = 0, totalAmt = 0, countAll = rides.length;
-
-            let ferialeMin = 0, ferialeKm = 0, ferialeAmt = 0, countFeriale = 0;
-            let notteMin = 0, notteKm = 0, notteAmt = 0, countNotte = 0;
-            let festivoMin = 0, festivoKm = 0, festivoAmt = 0, countFestivo = 0;
+            let totalMin = 0, totalKmVal = 0, totalAmt = 0;
+            let ferialeMin = 0, ferialeKm = 0, ferialeAmt = 0;
+            let notteMin = 0, notteKm = 0, notteAmt = 0;
+            let festivoMin = 0, festivoKm = 0, festivoAmt = 0;
 
             rides.forEach(r => {
                 const amt = r.amount || 0;
@@ -2050,25 +2047,18 @@
 
                 const isFest = isHolidayOrSunday(r.date);
 
-                // Regole richieste:
-                // Notte: dalle 21:00 alle 06:00 (per tutti i giorni)
                 if (hour >= 21 || hour < 6) {
                     notteMin += min;
                     notteKm += km;
                     notteAmt += amt;
-                    countNotte++;
                 } else if (isFest) {
-                    // Domenica o festivo dalle 06:00 alle 21:00
                     festivoMin += min;
                     festivoKm += km;
                     festivoAmt += amt;
-                    countFestivo++;
                 } else {
-                    // Giorno feriale (non domenica, non festivo, 06:00 - 21:00)
                     ferialeMin += min;
                     ferialeKm += km;
                     ferialeAmt += amt;
-                    countFeriale++;
                 }
             });
 
@@ -2113,17 +2103,13 @@
             document.getElementById('sum-cards').innerText = `€${cards.toFixed(2)}`;
             document.getElementById('sum-vouchers').innerText = `€${vouchers.toFixed(2)}`;
 
-            // Aggiorna le medie globali e per fasce
             const avgs = calculateAverages();
             document.getElementById('global-avg-min').innerText = `€${avgs.global.min}`;
             document.getElementById('global-avg-km').innerText = `€${avgs.global.km}`;
-
             document.getElementById('feriale-avg-min').innerText = `€${avgs.feriale.min}`;
             document.getElementById('feriale-avg-km').innerText = `€${avgs.feriale.km}`;
-
             document.getElementById('notte-avg-min').innerText = `€${avgs.notte.min}`;
             document.getElementById('notte-avg-km').innerText = `€${avgs.notte.km}`;
-
             document.getElementById('festivo-avg-min').innerText = `€${avgs.festivo.min}`;
             document.getElementById('festivo-avg-km').innerText = `€${avgs.festivo.km}`;
         }
