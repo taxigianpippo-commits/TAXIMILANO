@@ -32,7 +32,7 @@
         }
 
         body {
-            background-color: var--bg-body;
+            background-color: var(--bg-body);
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
@@ -411,10 +411,10 @@
 
             <button id="new-ride-btn" class="btn btn-large" style="opacity: 0.5;" onclick="checkAndOpenStartRide()">Inizio Corsa</button>
 
-            <!-- Ultima Corsa sempre in visione nella prima pagina -->
-            <div id="last-ride-card" class="card" style="margin-top: 1.5rem; display: none;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
-                    <h3 style="font-size: 0.95rem; color: var(--accent-primary); font-weight: 700;">ULTIMA CORSA</h3>
+            <!-- Ultima Corsa visibile esattamente sotto Inizio Corsa e sopra al totale -->
+            <div id="last-ride-card" class="card" style="margin-top: 1rem; display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <h3 style="font-size: 0.95rem; color: var(--accent-primary); font-weight: 700;">ULTIMA CORSA EFFETTUATA</h3>
                     <span id="last-ride-time-badge" class="badge badge-mode">--:--</span>
                 </div>
                 <div id="last-ride-details"></div>
@@ -1117,17 +1117,15 @@
         }
 
         function finalizeRide() {
-            // Calcolo minuti effettivi basati su orario partenza e arrivo
             let estMinutes = 10;
             if (currentRide.startTime && currentRide.endTime) {
                 const [hStart, mStart] = currentRide.startTime.time.split(':').map(Number);
                 const [hEnd, mEnd] = currentRide.endTime.time.split(':').map(Number);
                 let diff = (hEnd * 60 + mEnd) - (hStart * 60 + mStart);
-                if (diff < 0) diff += 24 * 60; // gestione cambio giorno
+                if (diff < 0) diff += 24 * 60;
                 estMinutes = Math.max(1, diff);
             }
 
-            // Calcolo stima KM basata su mappe (approssimazione coordinate o ricerca stringa)
             let distKm = 3.5;
             if (currentDepCoords && currentArrCoords) {
                 let dLat = currentArrCoords.lat - currentDepCoords.lat;
