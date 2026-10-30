@@ -32,7 +32,7 @@
         }
 
         body {
-            background-color: var(--bg-body);
+            background-color: var--bg-body;
             color: var(--text-main);
             min-height: 100vh;
             display: flex;
@@ -56,6 +56,7 @@
             color: #60a5fa;
         }
 
+        /* Tab di navigazione colorati e ingranditi su due righe */
         .nav-tabs {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -69,23 +70,33 @@
         }
 
         .tab-btn {
-            background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--border-card);
-            color: var(--text-muted);
+            color: #ffffff;
             padding: 0.6rem 0.2rem;
             border-radius: var(--radius-sm);
-            font-weight: 600;
+            font-weight: 700;
             font-size: 0.8rem;
             cursor: pointer;
             text-align: center;
             white-space: nowrap;
+            opacity: 0.75;
+            transition: opacity 0.2s, transform 0.1s;
         }
 
         .tab-btn.active {
-            background: var(--accent-primary);
-            color: #ffffff;
-            border-color: var(--accent-primary);
+            opacity: 1;
+            border-color: #fff;
+            box-shadow: 0 0 10px rgba(255,255,255,0.2);
         }
+
+        /* Colori distintivi per ogni tab */
+        .tab-rides { background: #3b82f6; }
+        .tab-history { background: #8b5cf6; }
+        .tab-summary { background: #10b981; }
+        .tab-stats { background: #f59e0b; }
+        .tab-expenses { background: #ef4444; }
+        .tab-km { background: #06b6d4; }
+        .tab-settings { background: #64748b; grid-column: span 2; }
 
         main {
             flex: 1;
@@ -348,7 +359,6 @@
             border-color: var(--accent-primary);
         }
 
-        /* Box privacy & aggiungi parcheggio in basso a destra */
         .bottom-floating-container {
             position: fixed;
             bottom: 15px;
@@ -414,13 +424,13 @@
     </header>
 
     <div class="nav-tabs">
-        <button class="tab-btn active" onclick="switchSection('rides')">Corsa</button>
-        <button class="tab-btn" onclick="switchSection('history')">Storico</button>
-        <button class="tab-btn" onclick="switchSection('summary')">Totali</button>
-        <button class="tab-btn" onclick="switchSection('stats')">Stats</button>
-        <button class="tab-btn" onclick="switchSection('expenses')">Spese</button>
-        <button class="tab-btn" onclick="switchSection('km-page')">KM & Tagliandi</button>
-        <button class="tab-btn" onclick="switchSection('settings')" style="grid-column: span 2;">Altro</button>
+        <button class="tab-btn tab-rides active" onclick="switchSection('rides')">Corsa</button>
+        <button class="tab-btn tab-history" onclick="switchSection('history')">Storico</button>
+        <button class="tab-btn tab-summary" onclick="switchSection('summary')">Totali</button>
+        <button class="tab-btn tab-stats" onclick="switchSection('stats')">Stats</button>
+        <button class="tab-btn tab-expenses" onclick="switchSection('expenses')">Spese</button>
+        <button class="tab-btn tab-km" onclick="switchSection('km-page')">KM & Tagliandi</button>
+        <button class="tab-btn tab-settings" onclick="switchSection('settings')">Altro</button>
     </div>
 
     <main>
@@ -460,6 +470,30 @@
                     <div id="sum-count" class="summary-value">0</div>
                 </div>
             </div>
+            
+            <!-- Medie Globali e per Fasce Tariffarie -->
+            <div class="card" style="border-color: var(--success);">
+                <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--success);">Medie Globali & Fasce Tariffarie</h3>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
+                    <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
+                        <div style="font-weight: 700; color: var(--accent-primary); margin-bottom: 0.2rem;">🌐 Globale (Tutte le corse)</div>
+                        <div style="display: flex; justify-content: space-between;"><span>€/Minuto: <strong id="global-avg-min">€0.00</strong></span><span>€/KM: <strong id="global-avg-km">€0.00</strong></span></div>
+                    </div>
+                    <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
+                        <div style="font-weight: 700; color: var(--warning); margin-bottom: 0.2rem;">☀️ Giorno Feriale (Lun-Sab 06:00 - 21:00)</div>
+                        <div style="display: flex; justify-content: space-between;"><span>€/Min: <strong id="feriale-avg-min">€0.00</strong></span><span>€/KM: <strong id="feriale-avg-km">€0.00</strong></span></div>
+                    </div>
+                    <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
+                        <div style="font-weight: 700; color: #a855f7; margin-bottom: 0.2rem;">🌙 Notte (Tutti i giorni 21:00 - 06:00)</div>
+                        <div style="display: flex; justify-content: space-between;"><span>€/Min: <strong id="notte-avg-min">€0.00</strong></span><span>€/KM: <strong id="notte-avg-km">€0.00</strong></span></div>
+                    </div>
+                    <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
+                        <div style="font-weight: 700; color: var(--success); margin-bottom: 0.2rem;">🎉 Domenica / Festivi (06:00 - 21:00)</div>
+                        <div style="display: flex; justify-content: space-between;"><span>€/Min: <strong id="festivo-avg-min">€0.00</strong></span><span>€/KM: <strong id="festivo-avg-km">€0.00</strong></span></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="card">
                 <div style="display: flex; justify-content: space-between; margin-bottom: 0.6rem;">
                     <span class="summary-label">Contanti</span>
@@ -500,7 +534,7 @@
             </div>
 
             <div class="card">
-                <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center;">Radio vs Parcheggio / Mano</h3>
+                <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center;">Modalità Presa Chiamata</h3>
                 <div style="display: flex; justify-content: center; gap: 0.3rem; margin-bottom: 0.75rem;">
                     <button class="filter-btn active" onclick="setPickupFilter('day', event)">Oggi</button>
                     <button class="filter-btn" onclick="setPickupFilter('week', event)">Settimana</button>
@@ -508,17 +542,6 @@
                     <button class="filter-btn" onclick="setPickupFilter('year', event)">Anno</button>
                 </div>
                 
-                <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 0.75rem;">
-                    <div style="display: flex; justify-content: space-between; background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
-                        <div><span style="font-weight: 600; font-size:0.9rem;">📻 Radio</span><div id="pickup-radio-count" style="font-size: 0.7rem; color: var(--text-muted);">0 corse (0%)</div></div>
-                        <span id="pickup-radio-amount" style="font-weight: 700; color: var(--accent-primary);">€0.00</span>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
-                        <div><span style="font-weight: 600; font-size:0.9rem;">🅿️ Parcheggio / Mano</span><div id="pickup-street-count" style="font-size: 0.7rem; color: var(--text-muted);">0 corse (0%)</div></div>
-                        <span id="pickup-street-amount" style="font-weight: 700; color: var(--success);">€0.00</span>
-                    </div>
-                </div>
-
                 <div style="position: relative; height: 180px; width: 100%;">
                     <canvas id="pickupChart"></canvas>
                 </div>
@@ -571,7 +594,10 @@
         </section>
 
         <section id="settings-section" class="section">
-            <button class="btn btn-secondary" onclick="exportDataExcelModal()">Esporta Excel (Personalizzato)</button>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+                <button class="btn btn-secondary" style="margin-top:0; font-size:0.9rem;" onclick="exportDataExcelModal()">Esporta Excel</button>
+                <button class="btn btn-secondary" style="margin-top:0; font-size:0.9rem; border-color:var(--success); color:var(--success);" onclick="openFixedRatesModal()">Tariffe Fisse</button>
+            </div>
             <button class="btn btn-secondary" onclick="backupData()">Backup Dati (JSON)</button>
             <button class="btn btn-secondary" style="border-color: rgba(239, 68, 68, 0.4);" onclick="restoreData()">Ripristina Dati</button>
             <input type="file" id="restore-file" style="display: none;" accept=".json" onchange="handleRestore(event)">
@@ -579,7 +605,6 @@
         </section>
     </main>
 
-    <!-- Widget Flottante in basso a destra (Aggiungi Parcheggio Taxi + Totale Privacy) -->
     <div class="bottom-floating-container">
         <button class="add-parking-quick-btn" onclick="openAddParkingModal()">🅿️ TAXI</button>
         <div class="privacy-total-box">
@@ -589,7 +614,6 @@
         </div>
     </div>
 
-    <!-- Modal Popup protetto -->
     <div id="modal-overlay" class="modal-overlay">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div id="modal-body"></div>
@@ -610,6 +634,15 @@
             { name: "Piazza Loreto", lat: 45.4812, lon: 9.2198 },
             { name: "San Babila", lat: 45.4665, lon: 9.1974 },
             { name: "Largo Augusto", lat: 45.4628, lon: 9.1963 }
+        ];
+
+        const fixedRatesList = [
+            { tratta: "Fiera Rho - Malpensa", prezzo: 94 },
+            { tratta: "Aeroporto Linate - Rho Fiera", prezzo: 68 },
+            { tratta: "Aeroporto Malpensa - Aeroporto Linate", prezzo: 128 },
+            { tratta: "Aeroporto Malpensa - Varese", prezzo: 80 },
+            { tratta: "Milano - Aeroporto Malpensa", prezzo: 114 },
+            { tratta: "Milano - Aeroporto Orio al Serio", prezzo: 128 }
         ];
 
         let currentRide = {};
@@ -763,9 +796,81 @@
             }
             currentRide = {};
             editingRideId = null;
-            openDepartureGPSModal();
+            openStartTimeModal(); // Invertito: prima l'orario di partenza
         }
 
+        // 1. Prima chiediamo l'orario di partenza
+        function openStartTimeModal() {
+            const now = new Date();
+            timeBuffer = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+            timeTargetField = 'startTime';
+            openTimeKeypadModal('Orario di Partenza', 'checkAndOpenStartRide');
+        }
+
+        function openTimeKeypadModal(title, backFunc) {
+            openModalContent(title, `
+                <input type="text" id="time-display" readonly style="font-size: 2rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-align:center; width:100%; background:#0f172a; border:1px solid var(--border-card); border-radius:var(--radius-md); padding:0.75rem;">
+                <div class="keypad-grid">
+                    <button class="keypad-btn" onclick="appendTime('1')">1</button>
+                    <button class="keypad-btn" onclick="appendTime('2')">2</button>
+                    <button class="keypad-btn" onclick="appendTime('3')">3</button>
+                    <button class="keypad-btn" onclick="appendTime('4')">4</button>
+                    <button class="keypad-btn" onclick="appendTime('5')">5</button>
+                    <button class="keypad-btn" onclick="appendTime('6')">6</button>
+                    <button class="keypad-btn" onclick="appendTime('7')">7</button>
+                    <button class="keypad-btn" onclick="appendTime('8')">8</button>
+                    <button class="keypad-btn" onclick="appendTime('9')">9</button>
+                    <button class="keypad-btn" style="color: var(--danger)" onclick="clearTime()">C</button>
+                    <button class="keypad-btn" onclick="appendTime('0')">0</button>
+                    <button class="keypad-btn" onclick="backspaceTime()">⌫</button>
+                </div>
+                <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                    <button class="btn btn-secondary" style="margin-top:0;" onclick="${backFunc}()">Indietro</button>
+                    <button class="btn" style="margin-top:0;" onclick="submitTimeValue()">Conferma</button>
+                </div>
+                <button class="btn btn-secondary btn-danger" style="margin-top:0.75rem;" onclick="cancelRideProcess()">Annulla Corsa</button>
+            `);
+            updateTimeDisplay();
+        }
+
+        function appendTime(digit) {
+            if (timeBuffer.length >= 4) timeBuffer = '';
+            timeBuffer += digit;
+            updateTimeDisplay();
+        }
+
+        function clearTime() {
+            timeBuffer = '';
+            updateTimeDisplay();
+        }
+
+        function backspaceTime() {
+            timeBuffer = timeBuffer.slice(0, -1);
+            updateTimeDisplay();
+        }
+
+        function updateTimeDisplay() {
+            const display = document.getElementById('time-display');
+            if (display) {
+                let padded = timeBuffer.padStart(4, '0');
+                display.value = padded.slice(0,2) + ':' + padded.slice(2,4);
+            }
+        }
+
+        function submitTimeValue() {
+            let padded = timeBuffer.padStart(4, '0');
+            let formattedTime = padded.slice(0,2) + ':' + padded.slice(2,4);
+            
+            if (timeTargetField === 'startTime') {
+                currentRide.startTime = { time: formattedTime, date: getCurrentDateTime().date };
+                openDepartureGPSModal(); // Passa alla geolocalizzazione partenza
+            } else if (timeTargetField === 'endTime') {
+                currentRide.endTime = { time: formattedTime, date: getCurrentDateTime().date };
+                finalizeRide();
+            }
+        }
+
+        // 2. Poi chiediamo la geolocalizzazione della partenza
         function openDepartureGPSModal() {
             openModalContent('Indirizzo Partenza', `
                 <button class="btn btn-large" onclick="captureDepartureGPS()">Geolocalizza Posizione GPS</button>
@@ -774,7 +879,8 @@
                     <input type="text" id="manual-departure" placeholder="Es. Piazza del Duomo, Milano">
                     <button class="btn" style="width: auto;" onclick="submitManualDeparture()">OK</button>
                 </div>
-                <button class="btn btn-secondary btn-danger" style="margin-top:1.5rem;" onclick="cancelRideProcess()">Annulla Corsa</button>
+                <button class="btn btn-secondary" style="margin-top:1rem;" onclick="openStartTimeModal()">Indietro</button>
+                <button class="btn btn-secondary btn-danger" style="margin-top:0.5rem;" onclick="cancelRideProcess()">Annulla Corsa</button>
             `);
         }
 
@@ -862,7 +968,7 @@
                     btn.innerText = 'Conferma';
                     btn.onclick = () => {
                         currentRide.departureAddress = currentDetectedStreet;
-                        openStartTimeModal();
+                        openPickupModeModal();
                     };
                     modalContent.appendChild(btn);
                 }
@@ -878,87 +984,19 @@
             currentRide.departureAddress = val;
             currentRide.nearestParking = "Manuale";
             currentDepCoords = {lat: 45.4641, lon: 9.1919};
-            openStartTimeModal();
-        }
-
-        function openStartTimeModal() {
-            const now = new Date();
-            timeBuffer = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
-            timeTargetField = 'startTime';
-            openTimeKeypadModal('Orario di Partenza', 'openDepartureGPSModal');
-        }
-
-        function openTimeKeypadModal(title, backFunc) {
-            openModalContent(title, `
-                <input type="text" id="time-display" readonly style="font-size: 2rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-align:center; width:100%; background:#0f172a; border:1px solid var(--border-card); border-radius:var(--radius-md); padding:0.75rem;">
-                <div class="keypad-grid">
-                    <button class="keypad-btn" onclick="appendTime('1')">1</button>
-                    <button class="keypad-btn" onclick="appendTime('2')">2</button>
-                    <button class="keypad-btn" onclick="appendTime('3')">3</button>
-                    <button class="keypad-btn" onclick="appendTime('4')">4</button>
-                    <button class="keypad-btn" onclick="appendTime('5')">5</button>
-                    <button class="keypad-btn" onclick="appendTime('6')">6</button>
-                    <button class="keypad-btn" onclick="appendTime('7')">7</button>
-                    <button class="keypad-btn" onclick="appendTime('8')">8</button>
-                    <button class="keypad-btn" onclick="appendTime('9')">9</button>
-                    <button class="keypad-btn" style="color: var(--danger)" onclick="clearTime()">C</button>
-                    <button class="keypad-btn" onclick="appendTime('0')">0</button>
-                    <button class="keypad-btn" onclick="backspaceTime()">⌫</button>
-                </div>
-                <div style="display:flex; gap:0.5rem; margin-top:1rem;">
-                    <button class="btn btn-secondary" style="margin-top:0;" onclick="${backFunc}()">Indietro</button>
-                    <button class="btn" style="margin-top:0;" onclick="submitTimeValue()">Conferma</button>
-                </div>
-                <button class="btn btn-secondary btn-danger" style="margin-top:0.75rem;" onclick="cancelRideProcess()">Annulla Corsa</button>
-            `);
-            updateTimeDisplay();
-        }
-
-        function appendTime(digit) {
-            if (timeBuffer.length >= 4) timeBuffer = '';
-            timeBuffer += digit;
-            updateTimeDisplay();
-        }
-
-        function clearTime() {
-            timeBuffer = '';
-            updateTimeDisplay();
-        }
-
-        function backspaceTime() {
-            timeBuffer = timeBuffer.slice(0, -1);
-            updateTimeDisplay();
-        }
-
-        function updateTimeDisplay() {
-            const display = document.getElementById('time-display');
-            if (display) {
-                let padded = timeBuffer.padStart(4, '0');
-                display.value = padded.slice(0,2) + ':' + padded.slice(2,4);
-            }
-        }
-
-        function submitTimeValue() {
-            let padded = timeBuffer.padStart(4, '0');
-            let formattedTime = padded.slice(0,2) + ':' + padded.slice(2,4);
-            
-            if (timeTargetField === 'startTime') {
-                currentRide.startTime = { time: formattedTime, date: getCurrentDateTime().date };
-                openPickupModeModal();
-            } else if (timeTargetField === 'endTime') {
-                currentRide.endTime = { time: formattedTime, date: getCurrentDateTime().date };
-                finalizeRide();
-            }
+            openPickupModeModal();
         }
 
         function openPickupModeModal() {
             openModalContent('Modalità Presa Chiamata', `
                 <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                     <button class="btn btn-large" onclick="savePickupMode('Radio 📻')">Radio 📻</button>
-                    <button class="btn btn-large btn-secondary" onclick="savePickupMode('Parcheggio / Mano 🅿️')">Parcheggio / Mano 🅿️</button>
+                    <button class="btn btn-large btn-secondary" onclick="savePickupMode('Parcheggio 🅿️')">Parcheggio 🅿️</button>
+                    <button class="btn btn-large btn-secondary" onclick="savePickupMode('Alzata di mano 🙋‍♂️')">Alzata di mano 🙋‍♂️</button>
+                    <button class="btn btn-large btn-secondary" onclick="savePickupMode('Cliente 😃')">Cliente 😃</button>
                 </div>
                 <div style="display:flex; gap:0.5rem; margin-top:1rem;">
-                    <button class="btn btn-secondary" style="margin-top:0;" onclick="openStartTimeModal()">Indietro</button>
+                    <button class="btn btn-secondary" style="margin-top:0;" onclick="openDepartureGPSModal()">Indietro</button>
                     <button class="btn btn-secondary btn-danger" style="margin-top:0;" onclick="cancelRideProcess()">Annulla</button>
                 </div>
             `);
@@ -1176,6 +1214,35 @@
             switchSection('rides');
             updatePrivacyTotalUI();
             updateLastRideUI();
+        }
+
+        // Funzione Tariffe Fisse
+        function openFixedRatesModal(inverted = false) {
+            let listHtml = '';
+            fixedRatesList.forEach((item, idx) => {
+                let displayTratta = item.tratta;
+                if (inverted) {
+                    let parts = item.tratta.split('-');
+                    if (parts.length === 2) {
+                        displayTratta = parts[1].trim() + " - " + parts[0].trim();
+                    }
+                }
+                listHtml += `
+                    <div class="ride-item" style="margin-bottom:0.5rem;">
+                        <div class="ride-info">
+                            <div style="font-weight: 700; font-size:0.9rem;">${displayTratta}</div>
+                        </div>
+                        <div class="ride-amount" style="font-size:1.1rem;">€${item.prezzo}</div>
+                    </div>
+                `;
+            });
+
+            const nextInvert = !inverted;
+            openModalContent('Tariffe Fisse Taxi', `
+                <button class="btn btn-secondary" style="margin-bottom:1rem; font-size:0.85rem;" onclick="openFixedRatesModal(${nextInvert})">🔄 Inverti Tratte</button>
+                <div style="max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:0.5rem;">${listHtml}</div>
+                <button class="btn btn-secondary" style="margin-top:1rem;" onclick="closeModal()">Chiudi</button>
+            `);
         }
 
         function openAddParkingModal() {
@@ -1731,7 +1798,7 @@
                         "Via Arrivo": r.arrivalAddress,
                         "Importo": r.amount ? r.amount.toFixed(2) : '0.00',
                         "Tipo di Pagamento": r.paymentMode,
-                        "📻 / 🅿️": r.pickupMode || '',
+                        "Presa": r.pickupMode || '',
                         "🅿️": r.nearestParking || '',
                         "Benzina": index === 0 && benzina > 0 ? benzina.toFixed(2) : '',
                         "Caselli": index === 0 && caselli > 0 ? caselli.toFixed(2) : '',
@@ -1861,27 +1928,15 @@
             else if (currentPickupPeriod === 'month') filteredRides = rides.filter(r => r.date >= startOfMonth);
             else if (currentPickupPeriod === 'year') filteredRides = rides.filter(r => r.date >= startOfYear);
 
-            let radioCount = 0, streetCount = 0;
-            let radioAmount = 0, streetAmount = 0;
-
+            let modeStats = {};
             filteredRides.forEach(r => {
-                const amt = r.amount || 0;
-                if (r.pickupMode && r.pickupMode.includes('Radio')) {
-                    radioCount++;
-                    radioAmount += amt;
-                } else {
-                    streetCount++;
-                    streetAmount += amt;
-                }
+                let m = r.pickupMode || 'Altro';
+                modeStats[m] = (modeStats[m] || 0) + (r.amount || 0);
             });
 
-            const totalCount = filteredRides.length;
-
-            document.getElementById('pickup-radio-count').innerText = `${radioCount} corse (${totalCount ? ((radioCount/totalCount)*100).toFixed(1) : 0}%)`;
-            document.getElementById('pickup-radio-amount').innerText = `€${radioAmount.toFixed(2)}`;
-
-            document.getElementById('pickup-street-count').innerText = `${streetCount} corse (${totalCount ? ((streetCount/totalCount)*100).toFixed(1) : 0}%)`;
-            document.getElementById('pickup-street-amount').innerText = `€${streetAmount.toFixed(2)}`;
+            const labels = Object.keys(modeStats);
+            const data = Object.values(modeStats);
+            const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444'];
 
             const ctx = document.getElementById('pickupChart');
             if (!ctx) return;
@@ -1890,10 +1945,10 @@
             pickupChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Radio', 'Parcheggio/Mano'],
+                    labels: labels.length > 0 ? labels : ['Nessun dato'],
                     datasets: [{
-                        data: [radioAmount, streetAmount],
-                        backgroundColor: ['#3b82f6', '#10b981'],
+                        data: data.length > 0 ? data : [0],
+                        backgroundColor: colors,
                         borderRadius: 6
                     }]
                 },
@@ -1946,6 +2001,97 @@
             });
         }
 
+        // Funzione per verificare se una data è festiva (es. feste fisse italiane + calcolo pasqua o simili)
+        function isHolidayOrSunday(dateStr) {
+            const d = new Date(dateStr);
+            const dayOfWeek = d.getDay(); // 0 = Domenica
+            if (dayOfWeek === 0) return true;
+
+            const day = d.getDate();
+            const month = d.getMonth() + 1; // 1-12
+            // Festività fisse italiane
+            const fixedHolidays = [
+                "1-1",   // Capodanno
+                "6-1",   // Epifania
+                "25-4",  // Liberazione
+                "1-5",   // Festa Lavoro
+                "2-6",   // Festa Repubblica
+                "15-8",  // Ferragosto
+                "1-11",  // Ognissanti
+                "8-12",  // Immacolata
+                "25-12", // Natale
+                "26-12"  // S.Stefano
+            ];
+            if (fixedHolidays.includes(`${day}-${month}`)) return true;
+            return false;
+        }
+
+        // Calcolo delle medie suddivise per fasce e globale
+        function calculateAverages() {
+            let totalMin = 0, totalKmVal = 0, totalAmt = 0, countAll = rides.length;
+
+            let ferialeMin = 0, ferialeKm = 0, ferialeAmt = 0, countFeriale = 0;
+            let notteMin = 0, notteKm = 0, notteAmt = 0, countNotte = 0;
+            let festivoMin = 0, festivoKm = 0, festivoAmt = 0, countFestivo = 0;
+
+            rides.forEach(r => {
+                const amt = r.amount || 0;
+                const min = r.estimatedMinutes || 0;
+                const km = r.estimatedKm || 0;
+
+                totalMin += min;
+                totalKmVal += km;
+                totalAmt += amt;
+
+                let hour = 10;
+                if (r.startTime && r.startTime.time) {
+                    hour = parseInt(r.startTime.time.split(':')[0], 10);
+                }
+
+                const isFest = isHolidayOrSunday(r.date);
+
+                // Regole richieste:
+                // Notte: dalle 21:00 alle 06:00 (per tutti i giorni)
+                if (hour >= 21 || hour < 6) {
+                    notteMin += min;
+                    notteKm += km;
+                    notteAmt += amt;
+                    countNotte++;
+                } else if (isFest) {
+                    // Domenica o festivo dalle 06:00 alle 21:00
+                    festivoMin += min;
+                    festivoKm += km;
+                    festivoAmt += amt;
+                    countFestivo++;
+                } else {
+                    // Giorno feriale (non domenica, non festivo, 06:00 - 21:00)
+                    ferialeMin += min;
+                    ferialeKm += km;
+                    ferialeAmt += amt;
+                    countFeriale++;
+                }
+            });
+
+            return {
+                global: {
+                    min: totalMin > 0 ? (totalAmt / totalMin).toFixed(2) : '0.00',
+                    km: totalKmVal > 0 ? (totalAmt / totalKmVal).toFixed(2) : '0.00'
+                },
+                feriale: {
+                    min: ferialeMin > 0 ? (ferialeAmt / ferialeMin).toFixed(2) : '0.00',
+                    km: ferialeKm > 0 ? (ferialeAmt / ferialeKm).toFixed(2) : '0.00'
+                },
+                notte: {
+                    min: notteMin > 0 ? (notteAmt / notteMin).toFixed(2) : '0.00',
+                    km: notteKm > 0 ? (notteAmt / notteKm).toFixed(2) : '0.00'
+                },
+                festivo: {
+                    min: festivoMin > 0 ? (festivoAmt / festivoMin).toFixed(2) : '0.00',
+                    km: festivoKm > 0 ? (festivoAmt / festivoKm).toFixed(2) : '0.00'
+                }
+            };
+        }
+
         function updateSummaryUI() {
             const today = getCurrentDateTime().date;
             const todayRides = rides.filter(r => r.date === today);
@@ -1966,6 +2112,20 @@
             document.getElementById('sum-cash').innerText = `€${cash.toFixed(2)}`;
             document.getElementById('sum-cards').innerText = `€${cards.toFixed(2)}`;
             document.getElementById('sum-vouchers').innerText = `€${vouchers.toFixed(2)}`;
+
+            // Aggiorna le medie globali e per fasce
+            const avgs = calculateAverages();
+            document.getElementById('global-avg-min').innerText = `€${avgs.global.min}`;
+            document.getElementById('global-avg-km').innerText = `€${avgs.global.km}`;
+
+            document.getElementById('feriale-avg-min').innerText = `€${avgs.feriale.min}`;
+            document.getElementById('feriale-avg-km').innerText = `€${avgs.feriale.km}`;
+
+            document.getElementById('notte-avg-min').innerText = `€${avgs.notte.min}`;
+            document.getElementById('notte-avg-km').innerText = `€${avgs.notte.km}`;
+
+            document.getElementById('festivo-avg-min').innerText = `€${avgs.festivo.min}`;
+            document.getElementById('festivo-avg-km').innerText = `€${avgs.festivo.km}`;
         }
 
         function updateStatsUI() {
