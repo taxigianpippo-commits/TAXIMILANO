@@ -184,6 +184,7 @@
             display: flex;
             gap: 0.5rem;
             align-items: center;
+            position: relative;
         }
 
         input[type="text"], input[type="number"], select {
@@ -383,9 +384,6 @@
             box-shadow: 0 4px 12px rgba(0,0,0,0.5);
             backdrop-filter: blur(5px);
         }
-        .add-parking-quick-btn:active {
-            transform: scale(0.95);
-        }
 
         .privacy-total-box {
             background: rgba(15, 23, 42, 0.95);
@@ -413,6 +411,43 @@
             cursor: pointer;
             font-size: 1rem;
             padding: 2px;
+        }
+
+        /* Stili per Suggerimenti Autocompletamento */
+        .suggestions-box {
+            position: absolute;
+            top: 100%;
+            left: 0; right: 0;
+            background: #0f172a;
+            border: 1px solid var(--accent-primary);
+            border-radius: var(--radius-md);
+            max-height: 150px;
+            overflow-y: auto;
+            z-index: 200;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .suggestion-item {
+            padding: 0.6rem 1rem;
+            font-size: 0.9rem;
+            border-bottom: 1px solid var(--border-card);
+            cursor: pointer;
+            text-align: left;
+            color: #f8fafc;
+        }
+        .suggestion-item:hover {
+            background: var(--accent-primary);
+        }
+
+        .parking-stats-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0f172a;
+            padding: 0.75rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-card);
+            margin-bottom: 0.75rem;
+            font-size: 0.8rem;
         }
     </style>
 </head>
@@ -559,7 +594,6 @@
             <button class="btn btn-secondary" onclick="openExpenseModal('Casello')">Registra Casello</button>
             <button class="btn btn-secondary" onclick="openExpenseModal('Manutenzione')">Registra Manutenzione</button>
             
-            <!-- Riepilogo Spese per Benzina, Caselli, Manutenzione (Giorno, Settimana, Mese, Anno) -->
             <div class="card" style="margin-top: 1rem; border-color: var(--danger);">
                 <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--danger);">Riepilogo Spese (Benzina, Caselli, Manutenzione)</h3>
                 <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;" id="expenses-summary-container"></div>
@@ -587,8 +621,16 @@
             </div>
 
             <div class="card">
-                <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--warning);">Mappatura Parcheggi Taxi</h3>
-                <button class="btn btn-secondary" style="margin-bottom: 1rem;" onclick="openAddParkingModal()">➕ Aggiungi Parcheggio Taxi (GPS)</button>
+                <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--warning);">Mappatura Parcheggi Taxi Milano</h3>
+                
+                <!-- BARRA STATISTICHE PARCHEGGI CARICATI / GPS -->
+                <div class="parking-stats-bar">
+                    <div>Totali: <strong id="p-stat-total" style="color:var(--accent-primary);">0</strong></div>
+                    <div>Con GPS: <strong id="p-stat-gps" style="color:var(--success);">0</strong></div>
+                    <div style="cursor:pointer;" onclick="openMissingParkingsModal()">Mancanti GPS: <strong id="p-stat-missing" style="color:var(--danger); text-decoration:underline;">0</strong></div>
+                </div>
+
+                <button class="btn btn-secondary" style="margin-bottom: 1rem;" onclick="openAddParkingModal()">➕ Aggiungi / Aggiorna Parcheggio (GPS)</button>
                 <div id="user-parking-list" class="rides-list"></div>
             </div>
 
@@ -634,19 +676,30 @@
     </div>
 
     <script>
-        const defaultTaxiParkingMilano = [
-            { name: "Linate (Aeroporto)", lat: 45.4451, lon: 9.2767 },
-            { name: "Stazione Centrale", lat: 45.4854, lon: 9.2045 },
-            { name: "Cadorna FN", lat: 45.4688, lon: 9.1762 },
-            { name: "Duomo", lat: 45.4641, lon: 9.1919 },
-            { name: "Garibaldi FS", lat: 45.4822, lon: 9.1873 },
-            { name: "Romolo M2", lat: 45.4377, lon: 9.1672 },
-            { name: "Famagosta M2", lat: 45.4275, lon: 9.1652 },
-            { name: "Lampugnano M1", lat: 45.4921, lon: 9.1294 },
-            { name: "Porta Genova M2", lat: 45.4517, lon: 9.1712 },
-            { name: "Piazza Loreto", lat: 45.4812, lon: 9.2198 },
-            { name: "San Babila", lat: 45.4665, lon: 9.1974 },
-            { name: "Largo Augusto", lat: 45.4628, lon: 9.1963 }
+        // Lista Completa dei Parcheggi Taxi Milano estratti dal video
+        const masterTaxiParkingsMilano = [
+            "24 Maggio", "25 Aprile", "5 Giornate", "8 Novembre", "Abbiategrasso", "Accursio", "Achille", "Affori FN", "Amendola", "Arese",
+            "Ascoli", "Astesani", "Babila", "Baggio", "Bande Nere", "Baracca", "Bausan", "Beltrade", "Berna", "Bicocca",
+            "Bignami", "Bisceglie", "Boccioni", "Bodio", "Boezio", "Bollate", "Bonola", "Bonomelli", "Bovisa", "Brescia",
+            "Bresso", "Briosi", "Buccinasco", "Burchiello", "Cadorna", "Cagliero", "Caldera", "Callas", "Cambini", "Carducci",
+            "Carlyle Brera", "Carrobbio", "Cascina Gatti", "Cassiodoro", "Cavour", "Cim. Lambrate", "Cincinnato", "Cinelandia", "Clotilde", "Colleoni",
+            "Cologno N.", "Commenda", "Cordusio", "Cormano", "Corsico", "Corvetto", "Cosmo Palace", "Crocetta", "Crowne Plaza", "Cuoco",
+            "Cusano Milan.", "Dateo", "De Angeli", "Diaz", "Diocleziano", "Domodossola", "Don Sturzo", "Due Orsi", "Duomo", "Emilia",
+            "Eufemia", "Europa", "Ex Galeazzi", "Falterona", "Famagosta", "Farini", "Fiera Rho E.", "Fiera Rho S.", "Firenze", "Fontana",
+            "Frattini", "Frova", "Gallarate", "Gallia", "Galvani", "Garibaldi", "Gattamelata", "Genova", "Giulietti", "Gobba",
+            "Gonzaga", "Gorla", "Greco", "Gulli", "Ieo", "Niguarda", "Paderno D.", "Pini", "Policlin.", "Raffaele",
+            "San Carlo", "San Paolo", "Humanitas", "Maggio", "Ibis", "Ikea San Giul.", "Irccs Galeazz.", "Istria", "IV Novembre", "Kennedy",
+            "Kolbe", "Lagosta", "Lama", "Lambrate", "Lampugnano", "Largo Augusto", "Lega L. Da", "Leopardi", "Liberazione", "Libia",
+            "Linate", "Lincoln", "Lodovica", "Londonio", "Loreto", "Lotto", "Luigi Savoia", "Oltre", "Manzoni", "Marina",
+            "Medaglie", "Mercato", "Merlata Bloom", "Milano", "Milanofiori", "Milano 2", "Mind", "Molino D. No", "Monza", "Morgantini",
+            "Multimedica", "Musocco", "Napoli", "Negrelli", "Novate M.", "Oberdan", "Opera", "Orio al Ser.", "Osp. Gerardo", "Osp. Ses. San G.",
+            "Ovidio", "Palace", "Parea", "Peschiera B. E.", "Pianelli", "Piemonte", "Piola", "Pirelli", "Plinio", "Pompeo Cast.",
+            "Prealpi", "Principe", "Ps San Paolo", "Repubblica", "Resistenza", "Rho", "Ripamonti 94", "Rogoredo", "Rondo", "Roserio",
+            "Rozzano", "Russoli", "San Donato Mi", "San Felice", "San Vittore", "Savoia Bus", "Scala", "Scarampo", "Senigallia", "Seregno",
+            "Seveso", "Sky", "Solari", "Spor. Opera", "Staz. Monza", "Staz. Saronno", "Stelline", "Susa", "Teodosio", "Terminal 1",
+            "Terminal 2", "Tirana", "Torricelli", "Tortona", "Treves", "Trezzano S/N", "Tribunale", "Tricolore", "Udine", "Ugo Bassi",
+            "Unahotel", "V. Alpini", "Val Di Sole", "Venezian", "Verri", "Vigano", "Villa Reale", "Vimodrone", "Virgilio", "Vitruvio",
+            "Volta", "Vulcano"
         ];
 
         const fixedRatesList = [
@@ -890,21 +943,80 @@
                 <button class="btn btn-large" onclick="captureDepartureGPS()">Geolocalizza Posizione GPS</button>
                 <div id="gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
                 <div class="input-group" style="margin-top: 0.75rem;">
-                    <input type="text" id="manual-departure" placeholder="Es. Piazza del Duomo, Milano">
-                    <button class="btn" style="width: auto;" onclick="submitManualDeparture()">OK</button>
+                    <input type="text" id="manual-departure" placeholder="Digita Parcheggio o Indirizzo" oninput="handleParkingSuggestions('manual-departure', 'dep-suggestions')">
+                    <div id="dep-suggestions" class="suggestions-box" style="display:none;"></div>
                 </div>
                 <button class="btn btn-secondary" style="margin-top:1rem;" onclick="openStartTimeModal()">Indietro</button>
                 <button class="btn btn-secondary btn-danger" style="margin-top:0.5rem;" onclick="cancelRideProcess()">Annulla Corsa</button>
             `);
         }
 
+        function handleParkingSuggestions(inputId, sugId) {
+            const inputVal = document.getElementById(inputId).value.toLowerCase().trim();
+            const sugBox = document.getElementById(sugId);
+
+            if (!inputVal) {
+                sugBox.style.display = 'none';
+                return;
+            }
+
+            const matches = masterTaxiParkingsMilano.filter(p => p.toLowerCase().includes(inputVal));
+
+            if (matches.length > 0) {
+                sugBox.style.display = 'block';
+                sugBox.innerHTML = matches.slice(0, 5).map(m => `
+                    <div class="suggestion-item" onclick="selectParkingSuggestion('${m}', '${inputId}', '${sugId}')">🅿️ ${m}</div>
+                `).join('');
+            } else {
+                sugBox.style.display = 'none';
+            }
+        }
+
+        function selectParkingSuggestion(name, inputId, sugId) {
+            document.getElementById(inputId).value = name;
+            document.getElementById(sugId).style.display = 'none';
+
+            if (inputId === 'manual-departure') {
+                geocodeAddressAndProceed(name, 'dep');
+            } else if (inputId === 'manual-arrival') {
+                geocodeAddressAndProceed(name, 'arr');
+            }
+        }
+
+        function geocodeAddressAndProceed(address, type) {
+            let fullSearch = address.toLowerCase().includes('milano') ? address : `${address}, Milano, Italia`;
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullSearch)}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.length > 0) {
+                        let coords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+                        if (type === 'dep') {
+                            currentDepCoords = coords;
+                            currentRide.departureAddress = address;
+                            currentRide.nearestParking = address;
+                            openPickupModeModal();
+                        } else {
+                            currentArrCoords = coords;
+                            currentRide.arrivalAddress = address;
+                            openEndTimeModal();
+                        }
+                    } else {
+                        if (type === 'dep') submitManualDeparture();
+                        else submitManualArrival();
+                    }
+                })
+                .catch(() => {
+                    if (type === 'dep') submitManualDeparture();
+                    else submitManualArrival();
+                });
+        }
+
         function findNearestTaxiParking(lat, lon) {
-            let allParkings = [...userParkings, ...defaultTaxiParkingMilano];
-            if (!lat || !lon || allParkings.length === 0) return null;
+            if (!lat || !lon || userParkings.length === 0) return null;
             let nearest = null;
             let minDistance = Infinity;
 
-            allParkings.forEach(parking => {
+            userParkings.forEach(parking => {
                 const dist = Math.sqrt(Math.pow(parking.lat - lat, 2) + Math.pow(parking.lon - lon, 2));
                 if (dist < minDistance) {
                     minDistance = dist;
@@ -997,7 +1109,6 @@
             }
             currentRide.departureAddress = val;
             currentRide.nearestParking = "Manuale";
-            currentDepCoords = {lat: 45.4641, lon: 9.1919};
             openPickupModeModal();
         }
 
@@ -1138,8 +1249,8 @@
                 <button class="btn btn-large" onclick="captureArrivalGPS()">Rileva Posizione Arrivo</button>
                 <div id="gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
                 <div class="input-group" style="margin-top: 0.75rem;">
-                    <input type="text" id="manual-arrival" placeholder="Es. Stazione Centrale, Milano">
-                    <button class="btn" style="width: auto;" onclick="submitManualArrival()">OK</button>
+                    <input type="text" id="manual-arrival" placeholder="Digita Parcheggio o Indirizzo Arrivo" oninput="handleParkingSuggestions('manual-arrival', 'arr-suggestions')">
+                    <div id="arr-suggestions" class="suggestions-box" style="display:none;"></div>
                 </div>
                 <div style="display:flex; gap:0.5rem; margin-top:1rem;">
                     <button class="btn btn-secondary" style="margin-top:0;" onclick="openPaymentModeModal()">Indietro</button>
@@ -1183,7 +1294,6 @@
                 val += ", Milano";
             }
             currentRide.arrivalAddress = val;
-            currentArrCoords = {lat: 45.4700, lon: 9.1800};
             openEndTimeModal();
         }
 
@@ -1194,7 +1304,8 @@
             openTimeKeypadModal('Orario Fine Corsa', 'openArrivalGPSModal');
         }
 
-        function finalizeRide() {
+        // Calcolo percorso preciso con chiamata ad OSRM (Google Maps / Waze)
+        async function finalizeRide() {
             let estMinutes = 10;
             if (currentRide.startTime && currentRide.endTime) {
                 const [hStart, mStart] = currentRide.startTime.time.split(':').map(Number);
@@ -1204,12 +1315,45 @@
                 estMinutes = Math.max(1, diff);
             }
 
-            let distKm = 3.5;
+            let distKm = 0;
+
+            // Se mancano le coordinate precise, proviamo la geocodifica al volo
+            if (!currentDepCoords && currentRide.departureAddress) {
+                try {
+                    let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(currentRide.departureAddress)}`);
+                    let data = await res.json();
+                    if (data && data.length > 0) currentDepCoords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+                } catch(e) {}
+            }
+
+            if (!currentArrCoords && currentRide.arrivalAddress) {
+                try {
+                    let res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(currentRide.arrivalAddress)}`);
+                    let data = await res.json();
+                    if (data && data.length > 0) currentArrCoords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+                } catch(e) {}
+            }
+
+            // Se abbiamo le due coordinate, calcoliamo il vero percorso stradale (OSRM)
             if (currentDepCoords && currentArrCoords) {
+                try {
+                    let osrmUrl = `https://router.project-osrm.org/route/v1/driving/${currentDepCoords.lon},${currentDepCoords.lat};${currentArrCoords.lon},${currentArrCoords.lat}?overview=false`;
+                    let routeRes = await fetch(osrmUrl);
+                    let routeData = await routeRes.json();
+                    if (routeData && routeData.routes && routeData.routes.length > 0) {
+                        distKm = Math.round((routeData.routes[0].distance / 1000) * 10) / 10;
+                    }
+                } catch(e) {}
+            }
+
+            // Fallback geometrico reale se OSRM fallisce
+            if (distKm === 0 && currentDepCoords && currentArrCoords) {
                 let dLat = currentArrCoords.lat - currentDepCoords.lat;
                 let dLon = currentArrCoords.lon - currentDepCoords.lon;
-                distKm = Math.max(1.0, Math.round(Math.sqrt(dLat*dLat + dLon*dLon) * 111 * 10) / 10);
+                distKm = Math.max(1.0, Math.round(Math.sqrt(dLat*dLat + dLon*dLon) * 111 * 1.3 * 10) / 10);
             }
+
+            if (distKm === 0) distKm = 4.8; // Fallback generico
 
             let costPerMin = estMinutes > 0 ? (currentRide.amount / estMinutes).toFixed(2) : '0.00';
             let costPerKm = distKm > 0 ? (currentRide.amount / distKm).toFixed(2) : '0.00';
@@ -1224,6 +1368,8 @@
             rides.push(currentRide);
             localStorage.setItem('taxiRides', JSON.stringify(rides));
             currentRide = {};
+            currentDepCoords = null;
+            currentArrCoords = null;
             closeModal();
             switchSection('rides');
             updatePrivacyTotalUI();
@@ -1262,13 +1408,13 @@
 
         function openAddParkingModal() {
             modalBody.innerHTML = `
-                <div class="modal-title">Aggiungi Parcheggio Taxi</div>
-                <button class="btn btn-large" onclick="captureParkingGPS()">Geolocalizza Posizione Parcheggio</button>
-                <div id="parking-gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
-                <div class="input-group" style="margin-top: 0.75rem; display:none;" id="parking-name-group">
-                    <input type="text" id="new-parking-name" placeholder="Nome Parcheggio (es. Stazione Garibaldi)">
-                    <button class="btn" style="width: auto;" onclick="saveNewParking()">Salva</button>
+                <div class="modal-title">Aggiungi / Aggiorna Parcheggio Taxi</div>
+                <div class="input-group" style="margin-bottom:0.75rem;">
+                    <input type="text" id="new-parking-name" placeholder="Nome Parcheggio (Seleziona o Scrivi)" oninput="handleParkingSuggestions('new-parking-name', 'p-add-sug')">
+                    <div id="p-add-sug" class="suggestions-box" style="display:none;"></div>
                 </div>
+                <button class="btn btn-large" onclick="captureParkingGPS()">Geolocalizza Posizione GPS</button>
+                <div id="parking-gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
                 <button class="btn btn-secondary" style="margin-top:1rem;" onclick="closeModal()">Chiudi</button>
             `;
             modalOverlay.classList.add('active');
@@ -1276,6 +1422,9 @@
 
         let tempParkingCoords = null;
         function captureParkingGPS() {
+            const name = document.getElementById('new-parking-name').value.trim();
+            if (!name) return alert("Digita prima il nome del parcheggio");
+
             const resDiv = document.getElementById('parking-gps-result');
             resDiv.style.display = 'block';
             resDiv.innerHTML = '<span style="color:var(--text-muted);">Rilevamento GPS in corso...</span>';
@@ -1288,50 +1437,50 @@
             navigator.geolocation.getCurrentPosition(
                 position => {
                     tempParkingCoords = { lat: position.coords.latitude, lon: position.coords.longitude };
-                    resDiv.innerHTML = `<span style="color:var(--success);">Posizione fissata! (${tempParkingCoords.lat.toFixed(4)}, ${tempParkingCoords.lon.toFixed(4)})</span>`;
-                    document.getElementById('parking-name-group').style.display = 'flex';
+                    saveNewParkingWithName(name, tempParkingCoords);
                 },
                 () => alert("Impossibile rilevare la posizione GPS"),
                 { enableHighAccuracy: true, timeout: 8000 }
             );
         }
 
-        function saveNewParking() {
-            const name = document.getElementById('new-parking-name').value;
-            if (!name) return alert("Inserisci il nome del parcheggio");
-            if (!tempParkingCoords) tempParkingCoords = { lat: 45.4641, lon: 9.1919 }; // fallback default se inserito manualmente senza GPS
-
-            // Controllo duplicati per nome o vicinanza coordinate (~100 metri)
-            let allExisting = [...userParkings, ...defaultTaxiParkingMilano];
-            let isDuplicate = false;
-            let duplicateReason = "";
-
-            for (let p of allExisting) {
-                let nameMatch = p.name.toLowerCase().trim() === name.toLowerCase().trim() || 
-                                p.name.toLowerCase().includes(name.toLowerCase().trim()) || 
-                                name.toLowerCase().includes(p.name.toLowerCase().trim());
-                
-                let dist = Math.sqrt(Math.pow(p.lat - tempParkingCoords.lat, 2) + Math.pow(p.lon - tempParkingCoords.lon, 2));
-                let coordMatch = dist < 0.001; // circa 100 metri
-
-                if (nameMatch || coordMatch) {
-                    isDuplicate = true;
-                    duplicateReason = nameMatch ? `Nome simile a "${p.name}"` : `Posizione vicina a "${p.name}"`;
-                    break;
-                }
+        function saveNewParkingWithName(name, coords) {
+            let existingIdx = userParkings.findIndex(p => p.name.toLowerCase() === name.toLowerCase());
+            if (existingIdx !== -1) {
+                userParkings[existingIdx].lat = coords.lat;
+                userParkings[existingIdx].lon = coords.lon;
+            } else {
+                userParkings.push({ id: Date.now(), name, lat: coords.lat, lon: coords.lon });
             }
-
-            if (isDuplicate) {
-                if (!confirm(`⚠️ Attenzione: Questo parcheggio sembra già esistere (${duplicateReason}). Vuoi aggiungerlo comunque?`)) {
-                    return;
-                }
-            }
-
-            userParkings.push({ id: Date.now(), name, lat: tempParkingCoords.lat, lon: tempParkingCoords.lon });
             localStorage.setItem('taxiUserParkings', JSON.stringify(userParkings));
             closeModal();
             updateKmPageUI();
-            alert("Parcheggio salvato con successo!");
+            alert(`Parcheggio "${name}" registrato con successo con coordinate GPS!`);
+        }
+
+        function openMissingParkingsModal() {
+            let savedNames = userParkings.map(p => p.name.toLowerCase());
+            let missing = masterTaxiParkingsMilano.filter(p => !savedNames.includes(p.toLowerCase()));
+
+            let htmlList = missing.map(m => `
+                <div class="ride-item" style="padding:0.6rem 1rem;">
+                    <div style="font-weight:700; font-size:0.9rem;">🅿️ ${m}</div>
+                    <button class="edit-btn" onclick="quickAddGPSForParking('${m}')">Aggiungi GPS</button>
+                </div>
+            `).join('');
+
+            openModalContent('Parcheggi Senza GPS (' + missing.length + ')', `
+                <div style="max-height:60vh; overflow-y:auto; display:flex; flex-direction:column; gap:0.4rem;">${htmlList}</div>
+                <button class="btn btn-secondary" style="margin-top:1rem;" onclick="closeModal()">Chiudi</button>
+            `);
+        }
+
+        function quickAddGPSForParking(name) {
+            closeModal();
+            setTimeout(() => {
+                openAddParkingModal();
+                document.getElementById('new-parking-name').value = name;
+            }, 300);
         }
 
         function deleteUserParking(id) {
@@ -1461,7 +1610,6 @@
                 container.appendChild(item);
             });
 
-            // Calcolo e visualizzazione del riepilogo spese (Benzina, Caselli, Manutenzione) x giorno, settimana, mese, anno
             const summaryContainer = document.getElementById('expenses-summary-container');
             if (summaryContainer) {
                 const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString().split('T')[0];
@@ -1622,10 +1770,19 @@
                 shiftsContainer.appendChild(item);
             });
 
+            // STATISTICHE PARCHEGGI TAXI MILANO
+            const totalMaster = masterTaxiParkingsMilano.length;
+            const registeredGps = userParkings.filter(p => p.lat && p.lon).length;
+            const missingGps = Math.max(0, totalMaster - registeredGps);
+
+            document.getElementById('p-stat-total').innerText = totalMaster;
+            document.getElementById('p-stat-gps').innerText = registeredGps;
+            document.getElementById('p-stat-missing').innerText = missingGps;
+
             const parkingContainer = document.getElementById('user-parking-list');
             parkingContainer.innerHTML = '';
             if (userParkings.length === 0) {
-                parkingContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center;">Nessun parcheggio personalizzato aggiunto.</div>';
+                parkingContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center;">Nessun parcheggio registrato con GPS.</div>';
             } else {
                 userParkings.forEach(p => {
                     const item = document.createElement('div');
@@ -1633,7 +1790,7 @@
                     item.innerHTML = `
                         <div class="ride-info">
                             <div style="font-weight: 700;">🅿️ ${p.name}</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted);">${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">${p.lat ? p.lat.toFixed(4) : '0'}, ${p.lon ? p.lon.toFixed(4) : '0'}</div>
                         </div>
                         <button class="delete-btn" onclick="deleteUserParking(${p.id})">Elimina</button>
                     `;
@@ -2102,7 +2259,6 @@
             return false;
         }
 
-        // Calcolo Medie Corretto: Somma Incassi diviso Somma Minuti / Somma KM
         function calculateAverages() {
             let totalMin = 0, totalKm = 0, totalAmt = 0;
             let ferialeMin = 0, ferialeKm = 0, ferialeAmt = 0;
