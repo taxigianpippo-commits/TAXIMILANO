@@ -37,6 +37,7 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            position: relative;
         }
 
         header {
@@ -61,6 +62,7 @@
             max-width: 500px;
             margin: 0 auto;
             width: 100%;
+            padding-bottom: 90px;
         }
 
         .nav-tabs {
@@ -352,6 +354,39 @@
             color: #ffffff;
             border-color: var(--accent-primary);
         }
+
+        /* Box privacy fisso in basso a destra */
+        .privacy-total-box {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid var(--border-card);
+            padding: 0.5rem 0.75rem;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            z-index: 50;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+        .privacy-total-box span {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+        .privacy-total-box strong {
+            font-size: 0.95rem;
+            color: var(--success);
+        }
+        .privacy-eye-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 2px;
+        }
     </style>
 </head>
 
@@ -505,6 +540,12 @@
             </div>
 
             <div class="card">
+                <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--warning);">Mappatura Parcheggi Taxi</h3>
+                <button class="btn btn-secondary" style="margin-bottom: 1rem;" onclick="openAddParkingModal()">➕ Aggiungi Parcheggio Taxi (GPS)</button>
+                <div id="user-parking-list" class="rides-list"></div>
+            </div>
+
+            <div class="card">
                 <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--warning);">Manutenzioni & Tagliandi Programmati</h3>
                 <button class="btn btn-secondary" style="margin-bottom: 1rem;" onclick="openMaintenanceConfigModal()">Aggiungi Nuova Scadenza</button>
                 <div id="maintenance-list" class="rides-list"></div>
@@ -520,7 +561,14 @@
         </section>
     </main>
 
-    <!-- Modal Popup protetto (non si chiude cliccando fuori) -->
+    <!-- Widget Privacy Totale in basso a destra -->
+    <div class="privacy-total-box">
+        <span>Oggi:</span>
+        <strong id="privacy-total-val">€0,00</strong>
+        <button class="privacy-eye-btn" id="privacy-eye-icon" onclick="togglePrivacyTotal()">👁️</button>
+    </div>
+
+    <!-- Modal Popup protetto -->
     <div id="modal-overlay" class="modal-overlay">
         <div class="modal-content" onclick="event.stopPropagation()">
             <div id="modal-body"></div>
@@ -528,7 +576,7 @@
     </div>
 
     <script>
-        const taxiParkingMilano = [
+        const defaultTaxiParkingMilano = [
             { name: "Linate (Aeroporto)", lat: 45.4451, lon: 9.2767 },
             { name: "Stazione Centrale", lat: 45.4854, lon: 9.2045 },
             { name: "Cadorna FN", lat: 45.4688, lon: 9.1762 },
@@ -546,15 +594,21 @@
         let currentRide = {};
         let editingRideId = null;
         let currentDetectedStreet = '';
+        let currentDepCoords = null;
+        let currentArrCoords = null;
         let amountBuffer = '';
+        let timeBuffer = '';
+        let timeTargetField = '';
         let paymentsChartInstance = null;
         let pickupChartInstance = null;
         let kmChartInstance = null;
         let currentPickupPeriod = 'day';
+        let privacyHidden = false;
 
         let rides = JSON.parse(localStorage.getItem('taxiRides')) || [];
         let expenses = JSON.parse(localStorage.getItem('taxiExpenses')) || [];
         let shifts = JSON.parse(localStorage.getItem('taxiShifts')) || [];
+        let userParkings = JSON.parse(localStorage.getItem('taxiUserParkings')) || [];
         let maints = JSON.parse(localStorage.getItem('taxiMaints')) || [
             { id: 1, name: "Tagliando Motore", intervalKm: 15000, lastKm: 0 },
             { id: 2, name: "Giro Pneumatici", intervalKm: 10000, lastKm: 0 }
@@ -566,8 +620,8 @@
             checkRevisionPopups();
             checkMaintenanceAlerts();
             updateServiceUI();
+            updatePrivacyTotalUI();
 
-            // Gestione tasto indietro del cellulare (Android/browser)
             window.addEventListener('popstate', (e) => {
                 const conf = confirm("Vuoi uscire dall'applicazione?");
                 if (!conf) {
@@ -598,129 +652,301 @@
             if (sectionId === 'history') updateRidesList();
             if (sectionId === 'expenses') updateExpensesList();
             if (sectionId === 'km-page') updateKmPageUI();
+            updatePrivacyTotalUI();
         }
 
         const modalOverlay = document.getElementById('modal-overlay');
         const modalBody = document.getElementById('modal-body');
 
-        function openModal(step, data = {}) {
-            modalBody.innerHTML = '';
-            let title = '';
-            let content = '';
-
-            switch (step) {
-                case 'start-time':
-                    title = 'Orario di Partenza';
-                    content = `<button class="btn btn-large" onclick="captureStartTime()">Imposta Ora Attuale</button>`;
-                    break;
-                case 'departure-address':
-                    title = 'Indirizzo Partenza';
-                    content = `
-                        <button class="btn btn-large" onclick="captureDepartureLocation()">Geolocalizza Posizione GPS</button>
-                        <div id="gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
-                        <div class="input-group" style="margin-top: 0.75rem;">
-                            <input type="text" id="manual-departure" placeholder="Oppure inserisci via manualmente">
-                            <button class="btn" style="width: auto;" onclick="submitManualDeparture()">OK</button>
-                        </div>
-                    `;
-                    break;
-                case 'pickup-mode':
-                    title = 'Modalità Presa Chiamata';
-                    content = `
-                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                            <button class="btn btn-large" onclick="savePickupMode('Radio 📻')">Radio 📻</button>
-                            <button class="btn btn-large btn-secondary" onclick="savePickupMode('Parcheggio / Mano 🅿️')">Parcheggio / Mano 🅿️</button>
-                        </div>
-                    `;
-                    break;
-                case 'arrival-address':
-                    title = 'Indirizzo di Arrivo';
-                    content = `
-                        <button class="btn btn-large" onclick="captureArrivalLocation()">Rileva Posizione Arrivo</button>
-                        <div id="gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
-                        <div class="input-group" style="margin-top: 0.75rem;">
-                            <input type="text" id="manual-arrival" placeholder="Oppure via manuale">
-                            <button class="btn" style="width: auto;" onclick="submitManualArrival()">OK</button>
-                        </div>
-                    `;
-                    break;
-                case 'end-time':
-                    title = 'Orario Fine Corsa';
-                    content = `<button class="btn btn-large" onclick="captureEndTime()">Fine Corsa Ora</button>`;
-                    break;
-                case 'amount':
-                    title = data.title || 'Importo (€)';
-                    content = `
-                        <input type="text" id="amount-display" inputmode="decimal" placeholder="0,00" readonly style="font-size: 2rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-align:center; width:100%; background:#0f172a; border:1px solid var(--border-card); border-radius:var(--radius-md); padding:0.75rem;">
-                        <div class="keypad-grid">
-                            <button class="keypad-btn" onclick="appendAmount('1')">1</button>
-                            <button class="keypad-btn" onclick="appendAmount('2')">2</button>
-                            <button class="keypad-btn" onclick="appendAmount('3')">3</button>
-                            <button class="keypad-btn" onclick="appendAmount('4')">4</button>
-                            <button class="keypad-btn" onclick="appendAmount('5')">5</button>
-                            <button class="keypad-btn" onclick="appendAmount('6')">6</button>
-                            <button class="keypad-btn" onclick="appendAmount('7')">7</button>
-                            <button class="keypad-btn" onclick="appendAmount('8')">8</button>
-                            <button class="keypad-btn" onclick="appendAmount('9')">9</button>
-                            <button class="keypad-btn" style="color: var(--danger)" onclick="clearAmount()">C</button>
-                            <button class="keypad-btn" onclick="appendAmount('0')">0</button>
-                            <button class="keypad-btn" onclick="appendAmount('00')">00</button>
-                        </div>
-                        <button class="btn btn-large" style="margin-top: 1rem;" onclick="${data.submitCallback}">Conferma Importo</button>
-                    `;
-                    break;
-                case 'payment-mode':
-                    title = 'Metodo di Pagamento';
-                    content = `
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                            <button class="btn btn-secondary" onclick="savePaymentMode('Contanti')">💵 Contanti</button>
-                            <button class="btn btn-secondary" onclick="savePaymentMode('Nexi')">💳 Nexi</button>
-                            <button class="btn btn-secondary" onclick="savePaymentMode('Bancomat')">💳 Bancomat</button>
-                            <button class="btn btn-secondary" onclick="savePaymentMode('Amex')">💳 Amex</button>
-                            <button class="btn btn-secondary" onclick="savePaymentStep2('App')">📱 App</button>
-                            <button class="btn btn-secondary" onclick="savePaymentStep2('Importo in Centrale')">🏢 Centrale</button>
-                            <button class="btn btn-secondary" onclick="savePaymentStep3('Assegno')">📝 Assegno</button>
-                            <button class="btn btn-secondary" onclick="savePaymentStep2('Globix')">💳 Globix</button>
-                            <button class="btn btn-secondary" onclick="savePaymentStep2('Samarcanda')">🚕 Samarcanda</button>
-                        </div>
-                    `;
-                    break;
-                case 'extra-code':
-                    title = data.title;
-                    content = `
-                        <div class="input-group">
-                            <input type="number" id="extra-code-input" inputmode="numeric" placeholder="${data.placeholder}">
-                            <button class="btn" style="width: auto;" onclick="submitExtraCode('${data.field}')">Salva</button>
-                        </div>
-                    `;
-                    break;
-            }
-
-            modalBody.innerHTML = `<div class="modal-title">${title}</div>${content}`;
+        function openModalContent(title, htmlContent) {
+            modalBody.innerHTML = `<div class="modal-title">${title}</div>${htmlContent}`;
             modalOverlay.classList.add('active');
-            updateAmountDisplay();
         }
 
         function closeModal() {
             modalOverlay.classList.remove('active');
         }
 
-        // Regola 23.59 / 00.00: le 00:00 appartengono al giorno successivo
+        function cancelRideProcess() {
+            if (confirm("Vuoi annullare la corsa corrente e tornare alla schermata principale?")) {
+                currentRide = {};
+                closeModal();
+                switchSection('rides');
+            }
+        }
+
+        function togglePrivacyTotal() {
+            privacyHidden = !privacyHidden;
+            updatePrivacyTotalUI();
+        }
+
+        function updatePrivacyTotalUI() {
+            const today = getCurrentDateTime().date;
+            const todayRides = rides.filter(r => r.date === today);
+            let total = todayRides.reduce((sum, r) => sum + (r.amount || 0), 0);
+            
+            const valEl = document.getElementById('privacy-total-val');
+            const eyeEl = document.getElementById('privacy-eye-icon');
+            if (valEl) {
+                if (privacyHidden) {
+                    valEl.innerText = "••••••";
+                    if (eyeEl) eyeEl.innerText = "🙈";
+                } else {
+                    valEl.innerText = `€${total.toFixed(2)}`;
+                    if (eyeEl) eyeEl.innerText = "👁️";
+                }
+            }
+        }
+
         function getCurrentDateTime() {
             const now = new Date();
             let hours = now.getHours();
             let minutes = now.getMinutes();
-            let dateObj = new Date(now);
-
-            // Se sono le 00:00 o successive ma prima delle 04:00 (o semplicemente gestendo il giorno successivo)
-            // L'utente specifica: "Le 00.00 sono già il giorno dopo e quindi una corsa fatta alle 0.01 è giorno dopo"
-            // Se scatta la mezzanotte, togliamo 1 giorno solare se consideriamo il turno che scivola, 
-            // ma new Date() restituisce già la data odierna. Se l'orario è 00:01, appartiene alla data corrente del sistema che per il computer è già il nuovo giorno.
-            // L'orario e la data nativi del sistema gestiscono già il cambio giorno alle 00:00.
             return {
                 time: String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0'),
                 date: now.toISOString().split('T')[0]
             };
+        }
+
+        // --- NUOVA SEQUENZA CORSA RICHIESTA ---
+        // 1. GPS Partenza -> 2. Orario Partenza -> 3. Radio/Parcheggio -> 4. Importo -> 5. Pagamento -> 6. Rileva Posizione Arrivo -> 7. Fine Corsa
+        function checkAndOpenStartRide() {
+            const activeShift = shifts.find(s => !s.endTime);
+            if (!activeShift) {
+                alert("Devi prima iniziare il servizio (KM) per registrare corse!");
+                return;
+            }
+            currentRide = {};
+            editingRideId = null;
+            openDepartureGPSModal();
+        }
+
+        // STEP 1: GPS Partenza
+        function openDepartureGPSModal() {
+            openModalContent('Indirizzo Partenza', `
+                <button class="btn btn-large" onclick="captureDepartureGPS()">Geolocalizza Posizione GPS</button>
+                <div id="gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
+                <div class="input-group" style="margin-top: 0.75rem;">
+                    <input type="text" id="manual-departure" placeholder="Oppure inserisci via manualmente">
+                    <button class="btn" style="width: auto;" onclick="submitManualDeparture()">OK</button>
+                </div>
+                <button class="btn btn-secondary btn-danger" style="margin-top:1.5rem;" onclick="cancelRideProcess()">Annulla Corsa</button>
+            `);
+        }
+
+        function findNearestTaxiParking(lat, lon) {
+            let allParkings = [...userParkings, ...defaultTaxiParkingMilano];
+            if (!lat || !lon || allParkings.length === 0) return null;
+            let nearest = null;
+            let minDistance = Infinity;
+
+            allParkings.forEach(parking => {
+                const dist = Math.sqrt(Math.pow(parking.lat - lat, 2) + Math.pow(parking.lon - lon, 2));
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearest = parking.name;
+                }
+            });
+            return nearest;
+        }
+
+        function fetchRealGPS(callback) {
+            const gpsResultDiv = document.getElementById('gps-result');
+            if (gpsResultDiv) {
+                gpsResultDiv.style.display = 'block';
+                gpsResultDiv.innerHTML = '<span style="color:var(--text-muted);">Rilevamento GPS in corso...</span>';
+            }
+
+            if (!navigator.geolocation) {
+                callback("Milano Centro", {lat: 45.4641, lon: 9.1919}, null);
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    const coords = { lat, lon };
+                    const nearestParking = findNearestTaxiParking(lat, lon);
+                    
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
+                        .then(response => response.json())
+                        .then(data => {
+                            let via = "";
+                            if (data && data.address) {
+                                via = data.address.road || data.address.pedestrian || data.address.street || data.address.suburb || "";
+                            }
+                            if (!via && data && data.display_name) {
+                                via = data.display_name.split(',')[0];
+                            }
+                            via = via.replace(/[0-9]/g, '').trim() || "Milano Centro";
+                            callback(via, coords, nearestParking);
+                        })
+                        .catch(() => callback("Milano Centro", coords, nearestParking));
+                },
+                () => callback("Milano Centro", {lat: 45.4641, lon: 9.1919}, null),
+                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+            );
+        }
+
+        function captureDepartureGPS() {
+            fetchRealGPS((street, coords, nearestParking) => {
+                currentDetectedStreet = street;
+                currentDepCoords = coords;
+                currentRide.nearestParking = nearestParking;
+                const gpsResultDiv = document.getElementById('gps-result');
+                if (gpsResultDiv) {
+                    gpsResultDiv.style.display = 'block';
+                    gpsResultDiv.innerHTML = `
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Indirizzo rilevato:</div>
+                        <div style="font-size: 1rem; font-weight:700; margin-top:0.2rem;">${street}</div>
+                        ${nearestParking ? `<div style="font-size: 0.8rem; color: var(--success); margin-top:0.2rem;">🅿️ Vicino a: <strong>${nearestParking}</strong></div>` : ''}
+                    `;
+                }
+                const inputManual = document.getElementById('manual-departure');
+                if (inputManual) inputManual.value = street;
+
+                const modalContent = modalBody.querySelector('.modal-content');
+                if (modalContent && !document.getElementById('gps-ok-btn')) {
+                    const btn = document.createElement('button');
+                    btn.id = 'gps-ok-btn';
+                    btn.className = 'btn btn-large';
+                    btn.style.marginTop = '0.75rem';
+                    btn.innerText = 'Conferma';
+                    btn.onclick = () => {
+                        currentRide.departureAddress = currentDetectedStreet;
+                        openStartTimeModal();
+                    };
+                    modalContent.appendChild(btn);
+                }
+            });
+        }
+
+        function submitManualDeparture() {
+            const val = document.getElementById('manual-departure').value;
+            if (!val) return alert("Inserisci una via");
+            currentRide.departureAddress = val;
+            currentRide.nearestParking = "Manuale";
+            currentDepCoords = {lat: 45.4641, lon: 9.1919}; // Default Milano centro stimato
+            openStartTimeModal();
+        }
+
+        // STEP 2: Orario Partenza (con tastiera numerica stile orario)
+        function openStartTimeModal() {
+            const now = new Date();
+            timeBuffer = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+            timeTargetField = 'startTime';
+            openTimeKeypadModal('Orario di Partenza', 'openDepartureGPSModal');
+        }
+
+        function openTimeKeypadModal(title, backFunc) {
+            openModalContent(title, `
+                <input type="text" id="time-display" readonly style="font-size: 2rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-align:center; width:100%; background:#0f172a; border:1px solid var(--border-card); border-radius:var(--radius-md); padding:0.75rem;">
+                <div class="keypad-grid">
+                    <button class="keypad-btn" onclick="appendTime('1')">1</button>
+                    <button class="keypad-btn" onclick="appendTime('2')">2</button>
+                    <button class="keypad-btn" onclick="appendTime('3')">3</button>
+                    <button class="keypad-btn" onclick="appendTime('4')">4</button>
+                    <button class="keypad-btn" onclick="appendTime('5')">5</button>
+                    <button class="keypad-btn" onclick="appendTime('6')">6</button>
+                    <button class="keypad-btn" onclick="appendTime('7')">7</button>
+                    <button class="keypad-btn" onclick="appendTime('8')">8</button>
+                    <button class="keypad-btn" onclick="appendTime('9')">9</button>
+                    <button class="keypad-btn" style="color: var(--danger)" onclick="clearTime()">C</button>
+                    <button class="keypad-btn" onclick="appendTime('0')">0</button>
+                    <button class="keypad-btn" onclick="backspaceTime()">⌫</button>
+                </div>
+                <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                    <button class="btn btn-secondary" style="margin-top:0;" onclick="${backFunc}()">Indietro</button>
+                    <button class="btn" style="margin-top:0;" onclick="submitTimeValue()">Conferma</button>
+                </div>
+                <button class="btn btn-secondary btn-danger" style="margin-top:0.75rem;" onclick="cancelRideProcess()">Annulla Corsa</button>
+            `);
+            updateTimeDisplay();
+        }
+
+        function appendTime(digit) {
+            if (timeBuffer.length >= 4) timeBuffer = '';
+            timeBuffer += digit;
+            updateTimeDisplay();
+        }
+
+        function clearTime() {
+            timeBuffer = '';
+            updateTimeDisplay();
+        }
+
+        function backspaceTime() {
+            timeBuffer = timeBuffer.slice(0, -1);
+            updateTimeDisplay();
+        }
+
+        function updateTimeDisplay() {
+            const display = document.getElementById('time-display');
+            if (display) {
+                let padded = timeBuffer.padStart(4, '0');
+                display.value = padded.slice(0,2) + ':' + padded.slice(2,4);
+            }
+        }
+
+        function submitTimeValue() {
+            let padded = timeBuffer.padStart(4, '0');
+            let formattedTime = padded.slice(0,2) + ':' + padded.slice(2,4);
+            
+            if (timeTargetField === 'startTime') {
+                currentRide.startTime = { time: formattedTime, date: getCurrentDateTime().date };
+                openPickupModeModal();
+            } else if (timeTargetField === 'endTime') {
+                currentRide.endTime = { time: formattedTime, date: getCurrentDateTime().date };
+                openAmountModal();
+            }
+        }
+
+        // STEP 3: Radio / Parcheggio
+        function openPickupModeModal() {
+            openModalContent('Modalità Presa Chiamata', `
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <button class="btn btn-large" onclick="savePickupMode('Radio 📻')">Radio 📻</button>
+                    <button class="btn btn-large btn-secondary" onclick="savePickupMode('Parcheggio / Mano 🅿️')">Parcheggio / Mano 🅿️</button>
+                </div>
+                <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                    <button class="btn btn-secondary" style="margin-top:0;" onclick="openStartTimeModal()">Indietro</button>
+                    <button class="btn btn-secondary btn-danger" style="margin-top:0;" onclick="cancelRideProcess()">Annulla</button>
+                </div>
+            `);
+        }
+
+        function savePickupMode(mode) {
+            currentRide.pickupMode = mode;
+            openAmountModalStep4();
+        }
+
+        // STEP 4: Importo (€)
+        function openAmountModalStep4() {
+            amountBuffer = '';
+            openModalContent('Importo Corsa (€)', `
+                <input type="text" id="amount-display" inputmode="decimal" placeholder="0,00" readonly style="font-size: 2rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-align:center; width:100%; background:#0f172a; border:1px solid var(--border-card); border-radius:var(--radius-md); padding:0.75rem;">
+                <div class="keypad-grid">
+                    <button class="keypad-btn" onclick="appendAmount('1')">1</button>
+                    <button class="keypad-btn" onclick="appendAmount('2')">2</button>
+                    <button class="keypad-btn" onclick="appendAmount('3')">3</button>
+                    <button class="keypad-btn" onclick="appendAmount('4')">4</button>
+                    <button class="keypad-btn" onclick="appendAmount('5')">5</button>
+                    <button class="keypad-btn" onclick="appendAmount('6')">6</button>
+                    <button class="keypad-btn" onclick="appendAmount('7')">7</button>
+                    <button class="keypad-btn" onclick="appendAmount('8')">8</button>
+                    <button class="keypad-btn" onclick="appendAmount('9')">9</button>
+                    <button class="keypad-btn" style="color: var(--danger)" onclick="clearAmount()">C</button>
+                    <button class="keypad-btn" onclick="appendAmount('0')">0</button>
+                    <button class="keypad-btn" onclick="appendAmount('00')">00</button>
+                </div>
+                <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                    <button class="btn btn-secondary" style="margin-top:0;" onclick="openPickupModeModal()">Indietro</button>
+                    <button class="btn" style="margin-top:0;" onclick="submitRideAmount()">Conferma Importo</button>
+                </div>
+                <button class="btn btn-secondary btn-danger" style="margin-top:0.75rem;" onclick="cancelRideProcess()">Annulla Corsa</button>
+            `);
+            updateAmountDisplay();
         }
 
         function appendAmount(digit) {
@@ -745,257 +971,90 @@
             }
         }
 
-        function openEditRideModal(id) {
-            const ride = rides.find(r => r.id === id);
-            if (!ride) return;
-            editingRideId = id;
-
-            modalBody.innerHTML = `
-                <div class="modal-title">Modifica Corsa</div>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <button class="btn btn-secondary" onclick="promptEditField('Orario Partenza', '${ride.startTime ? ride.startTime.time : ''}', 'startTime')">Modifica Orario Partenza</button>
-                    <button class="btn btn-secondary" onclick="promptEditField('Via Partenza', '${ride.departureAddress || ''}', 'departureAddress')">Modifica Via Partenza</button>
-                    <button class="btn btn-secondary" onclick="promptEditField('Via Arrivo', '${ride.arrivalAddress || ''}', 'arrivalAddress')">Modifica Via Arrivo</button>
-                    <button class="btn btn-secondary" onclick="promptEditField('Orario Arrivo', '${ride.endTime ? ride.endTime.time : ''}', 'endTime')">Modifica Orario Arrivo</button>
-                    <button class="btn btn-secondary" onclick="promptEditAmountForRide(${ride.amount || 0})">Modifica Importo (€)</button>
-                    <button class="btn btn-secondary" onclick="promptEditPayment('${ride.paymentMode || ''}')">Modifica Pagamento</button>
-                </div>
-                <button class="btn btn-secondary" style="margin-top:1rem;" onclick="closeModal()">Chiudi</button>
-            `;
-            modalOverlay.classList.add('active');
-        }
-
-        function promptEditField(title, currentVal, fieldKey) {
-            modalBody.innerHTML = `
-                <div class="modal-title">Modifica ${title}</div>
-                <div class="input-group">
-                    <input type="text" id="single-edit-input" value="${currentVal}">
-                    <button class="btn" style="width: auto;" onclick="saveSingleField('${fieldKey}')">Salva</button>
-                </div>
-            `;
-        }
-
-        function saveSingleField(fieldKey) {
-            const val = document.getElementById('single-edit-input').value;
-            rides = rides.map(r => {
-                if (r.id === editingRideId) {
-                    if (fieldKey === 'startTime' || fieldKey === 'endTime') {
-                        r[fieldKey] = { ...(r[fieldKey] || {}), time: val };
-                    } else {
-                        r[fieldKey] = val;
-                    }
-                }
-                return r;
-            });
-            localStorage.setItem('taxiRides', JSON.stringify(rides));
-            closeModal();
-            updateRidesList();
-            updateLastRideUI();
-        }
-
-        function promptEditAmountForRide(currentAmount) {
-            amountBuffer = Math.round(currentAmount * 100).toString();
-            openModal('amount', { title: 'Modifica Importo (€)', submitCallback: 'saveEditedRideAmount()' });
-        }
-
-        function saveEditedRideAmount() {
+        function submitRideAmount() {
             if (amountBuffer === '') return alert("Inserisci l'importo");
-            const newAmount = parseInt(amountBuffer, 10) / 100;
-            rides = rides.map(r => {
-                if (r.id === editingRideId) r.amount = newAmount;
-                return r;
-            });
-            localStorage.setItem('taxiRides', JSON.stringify(rides));
-            closeModal();
-            updateRidesList();
-            updateLastRideUI();
+            currentRide.amount = parseInt(amountBuffer, 10) / 100;
+            openPaymentModeModal();
         }
 
-        function promptEditPayment(currentPay) {
-            modalBody.innerHTML = `
-                <div class="modal-title">Modifica Pagamento</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
-                    <button class="btn btn-secondary" onclick="saveEditedPayment('Contanti')">💵 Contanti</button>
-                    <button class="btn btn-secondary" onclick="saveEditedPayment('Nexi')">💳 Nexi</button>
-                    <button class="btn btn-secondary" onclick="saveEditedPayment('Bancomat')">💳 Bancomat</button>
-                    <button class="btn btn-secondary" onclick="saveEditedPayment('Amex')">💳 Amex</button>
-                    <button class="btn btn-secondary" onclick="saveEditedPayment('App')">📱 App</button>
-                    <button class="btn btn-secondary" onclick="saveEditedPayment('Importo in Centrale')">🏢 Centrale</button>
+        // STEP 5: Metodo di Pagamento
+        function openPaymentModeModal() {
+            openModalContent('Metodo di Pagamento', `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom:1rem;">
+                    <button class="btn btn-secondary" onclick="savePaymentMode('Contanti')">💵 Contanti</button>
+                    <button class="btn btn-secondary" onclick="savePaymentMode('Nexi')">💳 Nexi</button>
+                    <button class="btn btn-secondary" onclick="savePaymentMode('Bancomat')">💳 Bancomat</button>
+                    <button class="btn btn-secondary" onclick="savePaymentMode('Amex')">💳 Amex</button>
+                    <button class="btn btn-secondary" onclick="savePaymentStep2('App')">📱 App</button>
+                    <button class="btn btn-secondary" onclick="savePaymentStep2('Importo in Centrale')">🏢 Centrale</button>
+                    <button class="btn btn-secondary" onclick="savePaymentStep3('Assegno')">📝 Assegno</button>
+                    <button class="btn btn-secondary" onclick="savePaymentStep2('Globix')">💳 Globix</button>
+                    <button class="btn btn-secondary" onclick="savePaymentStep2('Samarcanda')">🚕 Samarcanda</button>
                 </div>
-            `;
-        }
-
-        function saveEditedPayment(mode) {
-            rides = rides.map(r => {
-                if (r.id === editingRideId) {
-                    r.paymentMode = mode;
-                    r.paymentSubtype = mode;
-                }
-                return r;
-            });
-            localStorage.setItem('taxiRides', JSON.stringify(rides));
-            closeModal();
-            updateRidesList();
-            updateLastRideUI();
-        }
-
-        function checkAndOpenStartRide() {
-            const activeShift = shifts.find(s => !s.endTime);
-            if (!activeShift) {
-                alert("Devi prima iniziare il servizio (KM) per registrare corse!");
-                return;
-            }
-            amountBuffer = '';
-            currentRide = {};
-            editingRideId = null;
-            openModal('start-time');
-        }
-
-        function updateLastRideUI() {
-            const card = document.getElementById('last-ride-card');
-            const details = document.getElementById('last-ride-details');
-            const timeBadge = document.getElementById('last-ride-time-badge');
-            if (!card || !details) return;
-
-            if (rides.length === 0) {
-                card.style.display = 'none';
-                return;
-            }
-
-            const last = rides[rides.length - 1];
-            card.style.display = 'block';
-            timeBadge.innerText = `${last.startTime ? last.startTime.time : ''} - ${last.endTime ? last.endTime.time : ''}`;
-
-            details.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem;">
-                    <div>
-                        <div style="font-size: 1rem; font-weight: 700;">${last.departureAddress || 'Partenza N/A'}</div>
-                        <div style="font-size: 0.85rem; color: var(--text-muted);">➔ ${last.arrivalAddress || 'Arrivo N/A'}</div>
-                    </div>
-                    <div style="font-size: 1.3rem; font-weight: 800; color: var(--success);">€${last.amount ? last.amount.toFixed(2) : '0.00'}</div>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn btn-secondary" style="margin-top:0;" onclick="openAmountModalStep4()">Indietro</button>
+                    <button class="btn btn-secondary btn-danger" style="margin-top:0;" onclick="cancelRideProcess()">Annulla</button>
                 </div>
-                <div style="display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
-                    <span class="badge badge-mode">${last.pickupMode || ''}</span>
-                    <span class="badge badge-mode">${last.paymentMode || ''}</span>
-                    ${last.nearestParking ? `<span class="badge badge-parking">🅿️ ${last.nearestParking}</span>` : ''}
+            `);
+        }
+
+        function savePaymentMode(mode) {
+            currentRide.paymentMode = mode;
+            currentRide.paymentSubtype = mode;
+            openArrivalGPSModal();
+        }
+
+        function savePaymentStep2(mode) {
+            currentRide.paymentMode = mode;
+            currentRide.paymentSubtype = mode;
+            openExtraCodeModal('Numero Corsa', 'Numero corsa', 'rideNumber');
+        }
+
+        function savePaymentStep3(mode) {
+            currentRide.paymentMode = mode;
+            currentRide.paymentSubtype = mode;
+            openExtraCodeModal('Numero Buono', 'Numero buono', 'voucherNumber');
+        }
+
+        function openExtraCodeModal(title, placeholder, field) {
+            openModalContent(title, `
+                <div class="input-group" style="margin-bottom:1rem;">
+                    <input type="number" id="extra-code-input" inputmode="numeric" placeholder="${placeholder}">
                 </div>
-                <div style="display: flex; justify-content: flex-end; gap: 0.5rem; border-top: 1px solid var(--border-card); padding-top: 0.5rem;">
-                    <button class="edit-btn" onclick="openEditRideModal(${last.id})">Modifica</button>
-                    <button class="delete-btn" onclick="deleteRide(${last.id})">Elimina</button>
+                <div style="display:flex; gap:0.5rem;">
+                    <button class="btn btn-secondary" style="margin-top:0;" onclick="openPaymentModeModal()">Indietro</button>
+                    <button class="btn" style="margin-top:0;" onclick="submitExtraCode('${field}')">Salva</button>
                 </div>
-            `;
+            `);
         }
 
-        function captureStartTime() {
-            currentRide.startTime = getCurrentDateTime();
-            closeModal();
-            openModal('departure-address');
+        function submitExtraCode(field) {
+            const val = document.getElementById('extra-code-input').value;
+            if (!val) return alert("Inserisci il valore");
+            currentRide[field] = val;
+            openArrivalGPSModal();
         }
 
-        function findNearestTaxiParking(lat, lon) {
-            if (!lat || !lon) return null;
-            let nearest = null;
-            let minDistance = Infinity;
-
-            taxiParkingMilano.forEach(parking => {
-                const dist = Math.sqrt(Math.pow(parking.lat - lat, 2) + Math.pow(parking.lon - lon, 2));
-                if (dist < minDistance) {
-                    minDistance = dist;
-                    nearest = parking.name;
-                }
-            });
-            return nearest;
+        // STEP 6: Rileva Posizione Arrivo
+        function openArrivalGPSModal() {
+            openModalContent('Indirizzo di Arrivo', `
+                <button class="btn btn-large" onclick="captureArrivalGPS()">Rileva Posizione Arrivo</button>
+                <div id="gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
+                <div class="input-group" style="margin-top: 0.75rem;">
+                    <input type="text" id="manual-arrival" placeholder="Oppure via manuale">
+                    <button class="btn" style="width: auto;" onclick="submitManualArrival()">OK</button>
+                </div>
+                <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                    <button class="btn btn-secondary" style="margin-top:0;" onclick="openPaymentModeModal()">Indietro</button>
+                    <button class="btn btn-secondary btn-danger" style="margin-top:0;" onclick="cancelRideProcess()">Annulla</button>
+                </div>
+            `);
         }
 
-        function fetchRealGPS(callback) {
-            const gpsResultDiv = document.getElementById('gps-result');
-            if (gpsResultDiv) {
-                gpsResultDiv.style.display = 'block';
-                gpsResultDiv.innerHTML = '<span style="color:var(--text-muted);">Rilevamento GPS in corso...</span>';
-            }
-
-            if (!navigator.geolocation) {
-                callback("Milano Centro", null);
-                return;
-            }
-
-            navigator.geolocation.getCurrentPosition(
-                position => {
-                    const lat = position.coords.latitude;
-                    const lon = position.coords.longitude;
-                    const nearestParking = findNearestTaxiParking(lat, lon);
-                    
-                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
-                        .then(response => response.json())
-                        .then(data => {
-                            let via = "";
-                            if (data && data.address) {
-                                via = data.address.road || data.address.pedestrian || data.address.street || data.address.suburb || "";
-                            }
-                            if (!via && data && data.display_name) {
-                                via = data.display_name.split(',')[0];
-                            }
-                            via = via.replace(/[0-9]/g, '').trim() || "Milano Centro";
-                            callback(via, nearestParking);
-                        })
-                        .catch(() => callback("Milano Centro", nearestParking));
-                },
-                () => callback("Milano Centro", null),
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-            );
-        }
-
-        function captureDepartureLocation() {
-            fetchRealGPS((street, nearestParking) => {
+        function captureArrivalGPS() {
+            fetchRealGPS((street, coords) => {
                 currentDetectedStreet = street;
-                currentRide.nearestParking = nearestParking;
-                const gpsResultDiv = document.getElementById('gps-result');
-                if (gpsResultDiv) {
-                    gpsResultDiv.style.display = 'block';
-                    gpsResultDiv.innerHTML = `
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">Indirizzo rilevato:</div>
-                        <div style="font-size: 1rem; font-weight:700; margin-top:0.2rem;">${street}</div>
-                        ${nearestParking ? `<div style="font-size: 0.8rem; color: var(--success); margin-top:0.2rem;">🅿️ Vicino a: <strong>${nearestParking}</strong></div>` : ''}
-                    `;
-                }
-                const inputManual = document.getElementById('manual-departure');
-                if (inputManual) inputManual.value = street;
-
-                const modalContent = modalBody.querySelector('.modal-content');
-                if (modalContent && !document.getElementById('gps-ok-btn')) {
-                    const btn = document.createElement('button');
-                    btn.id = 'gps-ok-btn';
-                    btn.className = 'btn btn-large';
-                    btn.style.marginTop = '0.75rem';
-                    btn.innerText = 'Conferma';
-                    btn.onclick = () => {
-                        currentRide.departureAddress = currentDetectedStreet;
-                        closeModal();
-                        openModal('pickup-mode');
-                    };
-                    modalContent.appendChild(btn);
-                }
-            });
-        }
-
-        function submitManualDeparture() {
-            const val = document.getElementById('manual-departure').value;
-            if (!val) return alert("Inserisci una via");
-            currentRide.departureAddress = val;
-            currentRide.nearestParking = "Manuale";
-            closeModal();
-            openModal('pickup-mode');
-        }
-
-        function savePickupMode(mode) {
-            currentRide.pickupMode = mode;
-            closeModal();
-            openModal('arrival-address');
-        }
-
-        function captureArrivalLocation() {
-            fetchRealGPS((street) => {
-                currentDetectedStreet = street;
+                currentArrCoords = coords;
                 const gpsResultDiv = document.getElementById('gps-result');
                 if (gpsResultDiv) {
                     gpsResultDiv.style.display = 'block';
@@ -1013,8 +1072,7 @@
                     btn.innerText = 'Conferma';
                     btn.onclick = () => {
                         currentRide.arrivalAddress = currentDetectedStreet;
-                        closeModal();
-                        openModal('end-time');
+                        openEndTimeModal();
                     };
                     modalContent.appendChild(btn);
                 }
@@ -1025,61 +1083,99 @@
             const val = document.getElementById('manual-arrival').value;
             if (!val) return alert("Inserisci una via");
             currentRide.arrivalAddress = val;
-            closeModal();
-            openModal('end-time');
+            currentArrCoords = {lat: 45.4700, lon: 9.1800}; // stima
+            openEndTimeModal();
         }
 
-        function captureEndTime() {
-            currentRide.endTime = getCurrentDateTime();
-            amountBuffer = '';
-            closeModal();
-            openModal('amount', { title: 'Importo Corsa (€)', submitCallback: 'submitRideAmount()' });
-        }
-
-        function submitRideAmount() {
-            if (amountBuffer === '') return alert("Inserisci l'importo");
-            currentRide.amount = parseInt(amountBuffer, 10) / 100;
-            closeModal();
-            openModal('payment-mode');
-        }
-
-        function savePaymentMode(mode) {
-            currentRide.paymentMode = mode;
-            currentRide.paymentSubtype = mode;
-            finalizeRide();
-        }
-
-        function savePaymentStep2(mode) {
-            currentRide.paymentMode = mode;
-            currentRide.paymentSubtype = mode;
-            closeModal();
-            openModal('extra-code', { title: 'Numero Corsa', placeholder: 'Numero corsa', field: 'rideNumber' });
-        }
-
-        function savePaymentStep3(mode) {
-            currentRide.paymentMode = mode;
-            currentRide.paymentSubtype = mode;
-            closeModal();
-            openModal('extra-code', { title: 'Numero Buono', placeholder: 'Numero buono', field: 'voucherNumber' });
-        }
-
-        function submitExtraCode(field) {
-            const val = document.getElementById('extra-code-input').value;
-            if (!val) return alert("Inserisci il valore");
-            currentRide[field] = val;
-            finalizeRide();
+        // STEP 7: Fine Corsa (Orario) e Calcoli Tempo, KM, Costo min/km
+        function openEndTimeModal() {
+            const now = new Date();
+            timeBuffer = String(now.getHours()).padStart(2,'0') + String(now.getMinutes()).padStart(2,'0');
+            timeTargetField = 'endTime';
+            openTimeKeypadModal('Orario Fine Corsa', 'openArrivalGPSModal');
         }
 
         function finalizeRide() {
+            // Calcolo stima KM e Tempo dalle coordinate
+            let distKm = 3.5; // default stima
+            if (currentDepCoords && currentArrCoords) {
+                let dLat = currentArrCoords.lat - currentDepCoords.lat;
+                let dLon = currentArrCoords.lon - currentDepCoords.lon;
+                distKm = Math.max(1.0, Math.round(Math.sqrt(dLat*dLat + dLon*dLon) * 111 * 10) / 10);
+            }
+            let estMinutes = Math.max(5, Math.round(distKm * 3.5)); // es. 3.5 min al km in urbano
+            let costPerMin = estMinutes > 0 ? (currentRide.amount / estMinutes).toFixed(2) : '0.00';
+            let costPerKm = distKm > 0 ? (currentRide.amount / distKm).toFixed(2) : '0.00';
+
             currentRide.id = Date.now();
             currentRide.date = getCurrentDateTime().date;
+            currentRide.estimatedKm = distKm;
+            currentRide.estimatedMinutes = estMinutes;
+            currentRide.costPerMin = costPerMin;
+            currentRide.costPerKm = costPerKm;
+
             rides.push(currentRide);
             localStorage.setItem('taxiRides', JSON.stringify(rides));
             currentRide = {};
             closeModal();
             switchSection('rides');
+            updatePrivacyTotalUI();
         }
 
+        // --- GESTIONE MAPPATURA PARCHEGGI TAXI ---
+        function openAddParkingModal() {
+            modalBody.innerHTML = `
+                <div class="modal-title">Aggiungi Parcheggio Taxi</div>
+                <button class="btn btn-large" onclick="captureParkingGPS()">Geolocalizza Posizione Parcheggio</button>
+                <div id="parking-gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
+                <div class="input-group" style="margin-top: 0.75rem; display:none;" id="parking-name-group">
+                    <input type="text" id="new-parking-name" placeholder="Nome Parcheggio (es. Stazione Garibaldi)">
+                    <button class="btn" style="width: auto;" onclick="saveNewParking()">Salva</button>
+                </div>
+                <button class="btn btn-secondary" style="margin-top:1rem;" onclick="closeModal()">Chiudi</button>
+            `;
+            modalOverlay.classList.add('active');
+        }
+
+        let tempParkingCoords = null;
+        function captureParkingGPS() {
+            const resDiv = document.getElementById('parking-gps-result');
+            resDiv.style.display = 'block';
+            resDiv.innerHTML = '<span style="color:var(--text-muted);">Rilevamento GPS in corso...</span>';
+
+            if (!navigator.geolocation) {
+                alert("GPS non disponibile");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    tempParkingCoords = { lat: position.coords.latitude, lon: position.coords.longitude };
+                    resDiv.innerHTML = `<span style="color:var(--success);">Posizione fissata! (${tempParkingCoords.lat.toFixed(4)}, ${tempParkingCoords.lon.toFixed(4)})</span>`;
+                    document.getElementById('parking-name-group').style.display = 'flex';
+                },
+                () => alert("Impossibile rilevare la posizione GPS"),
+                { enableHighAccuracy: true, timeout: 8000 }
+            );
+        }
+
+        function saveNewParking() {
+            const name = document.getElementById('new-parking-name').value;
+            if (!name || !tempParkingCoords) return alert("Inserisci il nome e rileva la posizione");
+            userParkings.push({ id: Date.now(), name, lat: tempParkingCoords.lat, lon: tempParkingCoords.lon });
+            localStorage.setItem('taxiUserParkings', JSON.stringify(userParkings));
+            closeModal();
+            updateKmPageUI();
+            alert("Parcheggio salvato con successo!");
+        }
+
+        function deleteUserParking(id) {
+            userParkings = userParkings.filter(p => p.id !== id);
+            localStorage.setItem('taxiUserParkings', JSON.stringify(userParkings));
+            updateKmPageUI();
+        }
+
+        // --- GESTIONE SPESE & ALTRE FUNZIONI ---
         let currentExpenseType = '';
         let currentExpenseDesc = '';
 
@@ -1091,20 +1187,42 @@
                     <div class="modal-title">Spesa ${type}</div>
                     <div class="input-group" style="margin-bottom:0.75rem"><input type="text" id="exp-desc" placeholder="Descrizione"></div>
                     <button class="btn btn-large" onclick="saveExpenseDesc()">Avanti</button>
+                    <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="closeModal()">Annulla</button>
                 `;
                 modalOverlay.classList.add('active');
             } else {
                 currentExpenseDesc = '';
-                openModal('amount', { title: `Spesa ${type} (€)`, submitCallback: 'submitExpenseAmount()' });
+                openAmountModalForExpense(`Spesa ${type} (€)`);
             }
+        }
+
+        function openAmountModalForExpense(title) {
+            openModalContent(title, `
+                <input type="text" id="amount-display" inputmode="decimal" placeholder="0,00" readonly style="font-size: 2rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-align:center; width:100%; background:#0f172a; border:1px solid var(--border-card); border-radius:var(--radius-md); padding:0.75rem;">
+                <div class="keypad-grid">
+                    <button class="keypad-btn" onclick="appendAmount('1')">1</button>
+                    <button class="keypad-btn" onclick="appendAmount('2')">2</button>
+                    <button class="keypad-btn" onclick="appendAmount('3')">3</button>
+                    <button class="keypad-btn" onclick="appendAmount('4')">4</button>
+                    <button class="keypad-btn" onclick="appendAmount('5')">5</button>
+                    <button class="keypad-btn" onclick="appendAmount('6')">6</button>
+                    <button class="keypad-btn" onclick="appendAmount('7')">7</button>
+                    <button class="keypad-btn" onclick="appendAmount('8')">8</button>
+                    <button class="keypad-btn" onclick="appendAmount('9')">9</button>
+                    <button class="keypad-btn" style="color: var(--danger)" onclick="clearAmount()">C</button>
+                    <button class="keypad-btn" onclick="appendAmount('0')">0</button>
+                    <button class="keypad-btn" onclick="appendAmount('00')">00</button>
+                </div>
+                <button class="btn btn-large" style="margin-top: 1rem;" onclick="submitExpenseAmount()">Conferma Spesa</button>
+            `);
+            updateAmountDisplay();
         }
 
         function saveExpenseDesc() {
             const desc = document.getElementById('exp-desc').value;
             if (!desc) return alert("Inserisci la descrizione");
             currentExpenseDesc = desc;
-            closeModal();
-            openModal('amount', { title: `Spesa ${currentExpenseType} (€)`, submitCallback: 'submitExpenseAmount()' });
+            openAmountModalForExpense(`Spesa ${currentExpenseType} (€)`);
         }
 
         function submitExpenseAmount() {
@@ -1135,6 +1253,7 @@
                     <div class="ride-info">
                         <div style="font-weight: 700;">${r.startTime ? r.startTime.time : ''} - ${r.endTime ? r.endTime.time : ''}</div>
                         <div style="font-size: 0.85rem; color: var(--text-muted);">${r.departureAddress || ''} ➔ ${r.arrivalAddress || ''}</div>
+                        <div style="font-size: 0.75rem; color: var(--accent-primary);">⏱️ ${r.estimatedMinutes || 0} min | 🛣️ ${r.estimatedKm || 0} km (€${r.costPerKm || 0}/km)</div>
                         <div style="font-size: 0.75rem; color: var(--text-muted);">${r.pickupMode || ''} • ${r.paymentMode || ''}</div>
                         ${r.nearestParking ? `<div style="font-size: 0.75rem; color: var(--success);">🅿️ ${r.nearestParking}</div>` : ''}
                     </div>
@@ -1154,6 +1273,7 @@
             localStorage.setItem('taxiRides', JSON.stringify(rides));
             updateRidesList();
             updateLastRideUI();
+            updatePrivacyTotalUI();
         }
 
         function updateExpensesList() {
@@ -1192,7 +1312,7 @@
             location.reload();
         }
 
-        // --- GESTIONE SERVIZIO & KM (Con modifica KM errati) ---
+        // --- GESTIONE SERVIZIO & KM ---
         function openServiceModal() {
             const activeShift = shifts.find(s => !s.endTime);
             const lastShift = shifts.length > 0 ? shifts[shifts.length - 1] : null;
@@ -1206,6 +1326,7 @@
                         <input type="number" id="start-km-input" placeholder="KM Partenza" inputmode="numeric">
                     </div>
                     <button class="btn btn-large" onclick="startServiceSubmit(${lastKm})">Inizia Turno</button>
+                    <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="closeModal()">Annulla</button>
                 `;
             } else {
                 modalBody.innerHTML = `
@@ -1215,6 +1336,7 @@
                         <input type="number" id="end-km-input" placeholder="KM Arrivo" inputmode="numeric">
                     </div>
                     <button class="btn btn-large btn-danger" onclick="endServiceSubmit(${activeShift.startKm})">Termina Turno</button>
+                    <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="closeModal()">Annulla</button>
                 `;
             }
             modalOverlay.classList.add('active');
@@ -1277,7 +1399,6 @@
             const totalDriven = shifts.reduce((sum, s) => sum + (s.drivenKm || 0), 0);
             document.getElementById('total-km-driven').innerText = `${totalDriven} km`;
 
-            // Lista turni per modifica KM errati
             const shiftsContainer = document.getElementById('shifts-list');
             shiftsContainer.innerHTML = '';
             shifts.slice(-5).reverse().forEach(s => {
@@ -1292,6 +1413,26 @@
                 `;
                 shiftsContainer.appendChild(item);
             });
+
+            // Lista parcheggi utente
+            const parkingContainer = document.getElementById('user-parking-list');
+            parkingContainer.innerHTML = '';
+            if (userParkings.length === 0) {
+                parkingContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center;">Nessun parcheggio personalizzato aggiunto.</div>';
+            } else {
+                userParkings.forEach(p => {
+                    const item = document.createElement('div');
+                    item.className = 'ride-item';
+                    item.innerHTML = `
+                        <div class="ride-info">
+                            <div style="font-weight: 700;">🅿️ ${p.name}</div>
+                            <div style="font-size: 0.75rem; color: var(--text-muted);">${p.lat.toFixed(4)}, ${p.lon.toFixed(4)}</div>
+                        </div>
+                        <button class="delete-btn" onclick="deleteUserParking(${p.id})">Elimina</button>
+                    `;
+                    parkingContainer.appendChild(item);
+                });
+            }
 
             const container = document.getElementById('maintenance-list');
             container.innerHTML = '';
@@ -1357,6 +1498,7 @@
                         <input type="number" id="edit-end-km" value="${shift.endKm || 0}" inputmode="numeric">
                     </div>
                     <button class="btn btn-large" onclick="saveShiftKm()">Salva Nuovi KM</button>
+                    <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
                 </div>
             `;
             modalOverlay.classList.add('active');
@@ -1364,455 +1506,4 @@
 
         function saveShiftKm() {
             const newStart = parseInt(document.getElementById('edit-start-km').value, 10);
-            const newEnd = parseInt(document.getElementById('edit-end-km').value, 10);
-            if (isNaN(newStart) || isNaN(newEnd)) return alert("Inserisci valori numerici validi");
-            if (newEnd < newStart) return alert("I KM di arrivo non possono essere inferiori a quelli di partenza!");
-
-            shifts = shifts.map(s => {
-                if (s.id === editingShiftId) {
-                    s.startKm = newStart;
-                    s.endKm = newEnd;
-                    s.drivenKm = newEnd - newStart;
-                }
-                return s;
-            });
-            localStorage.setItem('taxiShifts', JSON.stringify(shifts));
-            closeModal();
-            updateKmPageUI();
-            updateServiceUI();
-        }
-
-        function openMaintenanceConfigModal() {
-            modalBody.innerHTML = `
-                <div class="modal-title">Nuova Manutenzione</div>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <input type="text" id="maint-name" placeholder="Nome (es. Tagliando, Gomme)">
-                    <input type="number" id="maint-km" placeholder="Intervallo KM (es. 15000)" inputmode="numeric">
-                    <button class="btn btn-large" onclick="saveNewMaintenance()">Salva Scadenza</button>
-                </div>
-            `;
-            modalOverlay.classList.add('active');
-        }
-
-        function saveNewMaintenance() {
-            const name = document.getElementById('maint-name').value;
-            const km = parseInt(document.getElementById('maint-km').value, 10);
-            if (!name || isNaN(km)) return alert("Inserisci dati validi");
-            maints.push({ id: Date.now(), name, intervalKm: km, lastKm: 0 });
-            localStorage.setItem('taxiMaints', JSON.stringify(maints));
-            closeModal();
-            updateKmPageUI();
-        }
-
-        function deleteMaint(id) {
-            maints = maints.filter(m => m.id !== id);
-            localStorage.setItem('taxiMaints', JSON.stringify(maints));
-            updateKmPageUI();
-        }
-
-        function checkMaintenanceAlerts() {
-            maints.forEach(m => {
-                const kmLeft = m.intervalKm - (m.lastKm % m.intervalKm);
-                if (kmLeft <= 500) {
-                    alert(`⚠️ ATTENZIONE SCADENZA: Manca poco per "${m.name}"! Mancano circa ${kmLeft} km.`);
-                }
-            });
-        }
-
-        function checkMonthlyPopup() {
-            const now = new Date();
-            if (now.getDate() === 1) {
-                const lastMonthExported = localStorage.getItem('taxiLastMonthlyAlert');
-                const todayStr = now.toISOString().split('T')[0];
-                if (lastMonthExported !== todayStr) {
-                    localStorage.setItem('taxiLastMonthlyAlert', todayStr);
-                    setTimeout(() => {
-                        alert("📅 È il 1° del mese! Ricordati di scaricare il foglio Excel del mese passato.");
-                    }, 1000);
-                }
-            }
-        }
-
-        // --- POP-UP FISSI REVISIONE OGNI 1 MAGGIO FINCHÉ NON SI DÀ L'OK ---
-        function checkRevisionPopups() {
-            const now = new Date();
-            const year = now.getFullYear();
-            const todayStr = `${year}-05-01`;
-
-            // Verifichiamo se oggi è il 1° maggio o se c'è un blocco attivo non confermato per l'anno in corso
-            if (now.getMonth() === 4 && now.getDate() === 1) {
-                const revDone = localStorage.getItem(`rev_done_${year}`);
-                if (!revDone) {
-                    showPersistentPopup('revision');
-                    return;
-                }
-                const payDone = localStorage.getItem(`pay_done_${year}`);
-                if (!payDone) {
-                    showPersistentPopup('payment');
-                    return;
-                }
-            }
-        }
-
-        function showPersistentPopup(type) {
-            const title = type === 'revision' ? '🚗 REVISIONE VEICOLO' : '💳 PAGAMENTO REVISIONE VEICOLO';
-            const msg = type === 'revision' 
-                ? 'È il 1° Maggio! Ricordati che devi effettuare la revisione del veicolo.' 
-                : 'È il 1° Maggio! Ricordati di effettuare il pagamento della revisione del veicolo.';
-            const key = type === 'revision' ? 'rev_done_' + new Date().getFullYear() : 'pay_done_' + new Date().getFullYear();
-
-            modalBody.innerHTML = `
-                <div class="modal-title" style="color:var(--warning);">${title}</div>
-                <p style="text-align:center; margin-bottom:1.5rem; font-size:0.95rem;">${msg}</p>
-                <button class="btn btn-large" onclick="confirmPersistentPopup('${key}')">Ho fatto / Conferma OK</button>
-            `;
-            modalOverlay.classList.add('active');
-        }
-
-        function confirmPersistentPopup(storageKey) {
-            localStorage.setItem(storageKey, 'true');
-            closeModal();
-            // Controlla se c'è l'altro pop-up da mostrare
-            checkRevisionPopups();
-        }
-
-        function exportDataExcelModal() {
-            const now = new Date();
-            const firstDayLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
-            const lastDayLastMonth = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
-
-            modalBody.innerHTML = `
-                <div class="modal-title">Esportazione Excel</div>
-                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem; text-align:center;">Seleziona il periodo da esportare:</div>
-                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                    <div>
-                        <label style="font-size:0.75rem; color:var(--text-muted);">Da data:</label>
-                        <input type="date" id="export-from" value="${firstDayLastMonth}" style="background:#0f172a; color:#fff; border:1px solid var(--border-card); padding:0.5rem; width:100%; border-radius:8px;">
-                    </div>
-                    <div>
-                        <label style="font-size:0.75rem; color:var(--text-muted);">A data:</label>
-                        <input type="date" id="export-to" value="${lastDayLastMonth}" style="background:#0f172a; color:#fff; border:1px solid var(--border-card); padding:0.5rem; width:100%; border-radius:8px;">
-                    </div>
-                    <button class="btn btn-large" onclick="executeExcelExport()">Scarica Excel</button>
-                </div>
-            `;
-            modalOverlay.classList.add('active');
-        }
-
-        function formatDateExcel(dateStr) {
-            const d = new Date(dateStr);
-            const months = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
-            const day = d.getDate();
-            const month = months[d.getMonth()];
-            const yearSuffix = String(d.getFullYear()).slice(-2);
-            return `${day} ${month} '${yearSuffix}`;
-        }
-
-        function executeExcelExport() {
-            const fromDate = document.getElementById('export-from').value;
-            const toDate = document.getElementById('export-to').value;
-            closeModal();
-
-            const filteredRides = rides.filter(r => r.date >= fromDate && r.date <= toDate);
-            const filteredExpenses = expenses.filter(e => e.date >= fromDate && e.date <= toDate);
-
-            const allDates = Array.from(new Set([...filteredRides.map(r => r.date), ...filteredExpenses.map(e => e.date)])).sort();
-            const cardTypes = ['Nexi', 'Bancomat', 'Amex'];
-            const voucherTypes = ['App', 'Importo in Centrale', 'Assegno', 'Globix', 'Samarcanda'];
-            const yearSuffixAll = allDates.length > 0 ? `'` + String(new Date(allDates[0]).getFullYear()).slice(-2) : `'26`;
-
-            // 1. Foglio: Tutte le Corse (Nomi colonne aggiornati)
-            const ridesSheetData = [];
-            allDates.forEach(dateStr => {
-                const formattedDate = formatDateExcel(dateStr);
-                const dayRides = filteredRides.filter(r => r.date === dateStr);
-                const dayExp = filteredExpenses.filter(e => e.date === dateStr);
-
-                const benzina = dayExp.filter(e => e.category === 'Benzina').reduce((sum, e) => sum + e.amount, 0);
-                const caselli = dayExp.filter(e => e.category === 'Casello').reduce((sum, e) => sum + e.amount, 0);
-                const manutenzioni = dayExp.filter(e => e.category === 'Manutenzione');
-
-                dayRides.forEach((r, index) => {
-                    ridesSheetData.push({
-                        "Data": index === 0 ? formattedDate : '',
-                        "Anno": yearSuffixAll,
-                        "Partenza": r.startTime ? r.startTime.time : '',
-                        "Arrivo": r.endTime ? r.endTime.time : '',
-                        "Via Partenza": r.departureAddress,
-                        "Via Arrivo": r.arrivalAddress,
-                        "Importo": r.amount ? r.amount.toFixed(2) : '0.00',
-                        "Tipo di Pagamento": r.paymentMode,
-                        "📻 / 🅿️": r.pickupMode || '',
-                        "🅿️": r.nearestParking || '',
-                        "Benzina": index === 0 && benzina > 0 ? benzina.toFixed(2) : '',
-                        "Caselli": index === 0 && caselli > 0 ? caselli.toFixed(2) : '',
-                        "Manutenzione": index === 0 && manutenzioni.length ? manutenzioni.map(m => m.description).join(', ') : '',
-                        "Importo Manutenzione": index === 0 && manutenzioni.length ? manutenzioni.reduce((sum, m) => sum + m.amount, 0).toFixed(2) : ''
-                    });
-                });
-            });
-
-            const cardsSheetData = allDates.map(dateStr => {
-                const dayRides = filteredRides.filter(r => r.date === dateStr && cardTypes.includes(r.paymentSubtype));
-                return {
-                    "Data": formatDateExcel(dateStr),
-                    "Anno": yearSuffixAll,
-                    "Totale Carte": dayRides.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Nexi": dayRides.filter(r => r.paymentSubtype === 'Nexi').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Bancomat": dayRides.filter(r => r.paymentSubtype === 'Bancomat').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Amex": dayRides.filter(r => r.paymentSubtype === 'Amex').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)
-                };
-            }).filter(day => day["Totale Carte"] > 0);
-
-            const vouchersSheetData = allDates.map(dateStr => {
-                const dayRides = filteredRides.filter(r => r.date === dateStr && voucherTypes.includes(r.paymentSubtype));
-                return {
-                    "Data": formatDateExcel(dateStr),
-                    "Anno": yearSuffixAll,
-                    "Totale Buoni": dayRides.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "App": dayRides.filter(r => r.paymentSubtype === 'App').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Importo in Centrale": dayRides.filter(r => r.paymentSubtype === 'Importo in Centrale').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Assegno": dayRides.filter(r => r.paymentSubtype === 'Assegno').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Globix": dayRides.filter(r => r.paymentSubtype === 'Globix').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Samarcanda": dayRides.filter(r => r.paymentSubtype === 'Samarcanda').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)
-                };
-            }).filter(day => day["Totale Buoni"] > 0);
-
-            // Totali Giornalieri (Colonna G = 70% del totale, Colonna S = tracciato somma D+E)
-            const totalsSheetData = allDates.map(dateStr => {
-                const dayRides = filteredRides.filter(r => r.date === dateStr);
-                const dayExp = filteredExpenses.filter(e => e.date === dateStr);
-                const total = dayRides.reduce((sum, r) => sum + (r.amount || 0), 0);
-                const cash = dayRides.filter(r => r.paymentSubtype === 'Contanti').reduce((sum, r) => sum + (r.amount || 0), 0);
-                const cards = dayRides.filter(r => cardTypes.includes(r.paymentSubtype)).reduce((sum, r) => sum + (r.amount || 0), 0);
-                const vouchers = dayRides.filter(r => voucherTypes.includes(r.paymentSubtype)).reduce((sum, r) => sum + (r.amount || 0), 0);
-                const settanta = total * 0.70;
-
-                return {
-                    "Data": formatDateExcel(dateStr),
-                    "Anno": yearSuffixAll,
-                    "Totale Giorno": total.toFixed(2),
-                    "Contanti": cash.toFixed(2),
-                    "Carte": cards.toFixed(2),
-                    "Buoni / App": vouchers.toFixed(2),
-                    "Colonna G (70%)": settanta.toFixed(2),
-                    "Colonna H": "", "Colonna I": "", "Colonna J": "", "Colonna K": "",
-                    "Colonna L": "", "Colonna M": "", "Colonna N": "", "Colonna O": "",
-                    "Colonna P": "", "Colonna Q": "", "Colonna R": "",
-                    "tracciato": (cash + cards).toFixed(2)
-                };
-            });
-
-            // Corrispettivi (Colonna B riporta il 70% / importo)
-            const corrSheetData = allDates.map(dateStr => {
-                const dayRides = filteredRides.filter(r => r.date === dateStr);
-                const total = dayRides.reduce((sum, r) => sum + (r.amount || 0), 0);
-                const settanta = total * 0.70;
-                return {
-                    "Data": formatDateExcel(dateStr),
-                    "Corrispettivi (70%)": settanta.toFixed(2),
-                    "Anno": yearSuffixAll
-                };
-            });
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ridesSheetData), "Tutte le Corse");
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cardsSheetData), "Carte");
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(vouchersSheetData), "Buoni e App");
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(totalsSheetData), "Totali Giornalieri");
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(corrSheetData), "Corrispettivi");
-
-            XLSX.writeFile(wb, `Taximeter_Galbo_${fromDate}_${toDate}.xlsx`);
-        }
-
-        function backupData() {
-            const blob = new Blob([JSON.stringify({ rides, expenses, shifts, maints })], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'backup_taxi_galbo.json';
-            a.click();
-        }
-
-        function restoreData() {
-            document.getElementById('restore-file').click();
-        }
-
-        function handleRestore(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(evt) {
-                const data = JSON.parse(evt.target.result);
-                rides = data.rides || [];
-                expenses = data.expenses || [];
-                shifts = data.shifts || [];
-                maints = data.maints || maints;
-                localStorage.setItem('taxiRides', JSON.stringify(rides));
-                localStorage.setItem('taxiExpenses', JSON.stringify(expenses));
-                localStorage.setItem('taxiShifts', JSON.stringify(shifts));
-                localStorage.setItem('taxiMaints', JSON.stringify(maints));
-                location.reload();
-            };
-            reader.readAsText(file);
-        }
-
-        function setPickupFilter(period, evt) {
-            currentPickupPeriod = period;
-            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
-            if (evt && evt.target) evt.target.classList.add('active');
-            renderPickupStats();
-        }
-
-        function renderPickupStats() {
-            const today = getCurrentDateTime().date;
-            const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString().split('T')[0];
-            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-            const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-
-            let filteredRides = [];
-            if (currentPickupPeriod === 'day') filteredRides = rides.filter(r => r.date === today);
-            else if (currentPickupPeriod === 'week') filteredRides = rides.filter(r => r.date >= startOfWeek);
-            else if (currentPickupPeriod === 'month') filteredRides = rides.filter(r => r.date >= startOfMonth);
-            else if (currentPickupPeriod === 'year') filteredRides = rides.filter(r => r.date >= startOfYear);
-
-            let radioCount = 0, streetCount = 0;
-            let radioAmount = 0, streetAmount = 0;
-
-            filteredRides.forEach(r => {
-                const amt = r.amount || 0;
-                if (r.pickupMode && r.pickupMode.includes('Radio')) {
-                    radioCount++;
-                    radioAmount += amt;
-                } else {
-                    streetCount++;
-                    streetAmount += amt;
-                }
-            });
-
-            const totalCount = filteredRides.length;
-
-            document.getElementById('pickup-radio-count').innerText = `${radioCount} corse (${totalCount ? ((radioCount/totalCount)*100).toFixed(1) : 0}%)`;
-            document.getElementById('pickup-radio-amount').innerText = `€${radioAmount.toFixed(2)}`;
-
-            document.getElementById('pickup-street-count').innerText = `${streetCount} corse (${totalCount ? ((streetCount/totalCount)*100).toFixed(1) : 0}%)`;
-            document.getElementById('pickup-street-amount').innerText = `€${streetAmount.toFixed(2)}`;
-
-            const ctx = document.getElementById('pickupChart');
-            if (!ctx) return;
-            if (pickupChartInstance) pickupChartInstance.destroy();
-
-            pickupChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['Radio', 'Parcheggio/Mano'],
-                    datasets: [{
-                        data: [radioAmount, streetAmount],
-                        backgroundColor: ['#3b82f6', '#10b981'],
-                        borderRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                        x: { ticks: { color: '#f8fafc' }, grid: { display: false } }
-                    }
-                }
-            });
-        }
-
-        function renderPaymentsChart() {
-            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-            const monthRides = rides.filter(r => r.date >= startOfMonth);
-
-            let cash = 0, cards = 0, vouchers = 0;
-            const cardTypes = ['Nexi', 'Bancomat', 'Amex'];
-            const voucherTypes = ['App', 'Importo in Centrale', 'Assegno', 'Globix', 'Samarcanda'];
-
-            monthRides.forEach(r => {
-                const amt = r.amount || 0;
-                if (r.paymentSubtype === 'Contanti') cash += amt;
-                else if (cardTypes.includes(r.paymentSubtype)) cards += amt;
-                else if (voucherTypes.includes(r.paymentSubtype)) vouchers += amt;
-            });
-
-            const ctx = document.getElementById('paymentsChart');
-            if (!ctx) return;
-            if (paymentsChartInstance) paymentsChartInstance.destroy();
-
-            paymentsChartInstance = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Contanti', 'Carte', 'Buoni / App'],
-                    datasets: [{
-                        data: [cash, cards, vouchers],
-                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b'],
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { position: 'bottom', labels: { color: '#f8fafc', boxWidth: 12 } } }
-                }
-            });
-        }
-
-        function updateSummaryUI() {
-            const today = getCurrentDateTime().date;
-            const todayRides = rides.filter(r => r.date === today);
-            
-            let total = 0, cash = 0, cards = 0, vouchers = 0;
-            const cardTypes = ['Nexi', 'Bancomat', 'Amex'];
-            const voucherTypes = ['App', 'Importo in Centrale', 'Assegno', 'Globix', 'Samarcanda'];
-
-            todayRides.forEach(r => {
-                total += r.amount || 0;
-                if (r.paymentSubtype === 'Contanti') cash += r.amount || 0;
-                else if (cardTypes.includes(r.paymentSubtype)) cards += r.amount || 0;
-                else if (voucherTypes.includes(r.paymentSubtype)) vouchers += r.amount || 0;
-            });
-
-            document.getElementById('sum-total').innerText = `€${total.toFixed(2)}`;
-            document.getElementById('sum-count').innerText = todayRides.length;
-            document.getElementById('sum-cash').innerText = `€${cash.toFixed(2)}`;
-            document.getElementById('sum-cards').innerText = `€${cards.toFixed(2)}`;
-            document.getElementById('sum-vouchers').innerText = `€${vouchers.toFixed(2)}`;
-        }
-
-        function updateStatsUI() {
-            const today = getCurrentDateTime().date;
-            const startOfWeek = new Date(new Date().setDate(new Date().getDate() - new Date().getDay())).toISOString().split('T')[0];
-            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
-            const startOfYear = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
-
-            let dayTotal = 0, weekTotal = 0, monthTotal = 0, yearTotal = 0;
-
-            rides.forEach(r => {
-                const amt = r.amount || 0;
-                if (r.date === today) dayTotal += amt;
-                if (r.date >= startOfWeek) weekTotal += amt;
-                if (r.date >= startOfMonth) monthTotal += amt;
-                if (r.date >= startOfYear) yearTotal += amt;
-            });
-
-            document.getElementById('stat-day').innerText = `€${dayTotal.toFixed(2)}`;
-            document.getElementById('stat-week').innerText = `€${weekTotal.toFixed(2)}`;
-            document.getElementById('stat-month').innerText = `€${monthTotal.toFixed(2)}`;
-            document.getElementById('stat-year').innerText = `€${yearTotal.toFixed(2)}`;
-
-            const targetAmount = 6000;
-            const remaining = Math.max(0, targetAmount - monthTotal);
-            const percentage = Math.min(100, (monthTotal / targetAmount) * 100);
-
-            document.getElementById('obj-current').innerText = `€${monthTotal.toFixed(2)}`;
-            document.getElementById('obj-remaining').innerText = `€${remaining.toFixed(2)}`;
-            document.getElementById('obj-progress-bar').style.width = `${percentage}%`;
-            document.getElementById('obj-percentage').innerText = `${percentage.toFixed(1)}% raggiunto`;
-        }
-    </script>
-</body>
-</html>
+            const newEnd = parseInt(
