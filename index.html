@@ -943,9 +943,29 @@
                     <input type="text" id="manual-departure" placeholder="Digita Parcheggio o Indirizzo" oninput="handleParkingSuggestions('manual-departure', 'dep-suggestions')">
                     <div id="dep-suggestions" class="suggestions-box" style="display:none;"></div>
                 </div>
-                <button class="btn btn-secondary" style="margin-top:1rem;" onclick="openStartTimeModal()">Indietro</button>
-                <button class="btn btn-secondary btn-danger" style="margin-top:0.5rem;" onclick="cancelRideProcess()">Annulla Corsa</button>
+                <button class="btn btn-large" style="margin-top:0.75rem; background: var(--success);" onclick="confirmManualDepartureButton()">Conferma Partenza</button>
+                <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
+                    <button class="btn btn-secondary" style="margin-top:0;" onclick="openStartTimeModal()">Indietro</button>
+                    <button class="btn btn-secondary btn-danger" style="margin-top:0;" onclick="cancelRideProcess()">Annulla</button>
+                </div>
             `);
+        }
+
+        function confirmManualDepartureButton() {
+            let val = document.getElementById('manual-departure').value;
+            if (!val) {
+                if (currentDetectedStreet) {
+                    val = currentDetectedStreet;
+                } else {
+                    return alert("Inserisci o geolocalizza un indirizzo");
+                }
+            }
+            if (!val.toLowerCase().includes('milano')) {
+                val += ", Milano";
+            }
+            currentRide.departureAddress = val;
+            if (!currentRide.nearestParking) currentRide.nearestParking = "Manuale";
+            openPickupModeModal();
         }
 
         function handleParkingSuggestions(inputId, sugId) {
@@ -991,21 +1011,13 @@
                             currentDepCoords = coords;
                             currentRide.departureAddress = address;
                             currentRide.nearestParking = address;
-                            openPickupModeModal();
                         } else {
                             currentArrCoords = coords;
                             currentRide.arrivalAddress = address;
-                            openEndTimeModal();
                         }
-                    } else {
-                        if (type === 'dep') submitManualDeparture();
-                        else submitManualArrival();
                     }
                 })
-                .catch(() => {
-                    if (type === 'dep') submitManualDeparture();
-                    else submitManualArrival();
-                });
+                .catch(() => {});
         }
 
         function findNearestTaxiParking(lat, lon) {
@@ -1081,34 +1093,7 @@
                 }
                 const inputManual = document.getElementById('manual-departure');
                 if (inputManual) inputManual.value = address;
-
-                // Controlla e aggiunge il pulsante di conferma se non è già presente
-                const modalContent = modalBody.querySelector('.modal-content');
-                let okBtn = document.getElementById('gps-ok-btn');
-                if (!okBtn && modalContent) {
-                    const btn = document.createElement('button');
-                    btn.id = 'gps-ok-btn';
-                    btn.className = 'btn btn-large';
-                    btn.style.marginTop = '0.75rem';
-                    btn.innerText = 'Conferma Indirizzo';
-                    btn.onclick = () => {
-                        currentRide.departureAddress = currentDetectedStreet;
-                        openPickupModeModal();
-                    };
-                    modalContent.appendChild(btn);
-                }
             });
-        }
-
-        function submitManualDeparture() {
-            let val = document.getElementById('manual-departure').value;
-            if (!val) return alert("Inserisci un indirizzo");
-            if (!val.toLowerCase().includes('milano')) {
-                val += ", Milano";
-            }
-            currentRide.departureAddress = val;
-            currentRide.nearestParking = "Manuale";
-            openPickupModeModal();
         }
 
         function openPickupModeModal() {
@@ -1251,11 +1236,28 @@
                     <input type="text" id="manual-arrival" placeholder="Digita Parcheggio o Indirizzo Arrivo" oninput="handleParkingSuggestions('manual-arrival', 'arr-suggestions')">
                     <div id="arr-suggestions" class="suggestions-box" style="display:none;"></div>
                 </div>
-                <div style="display:flex; gap:0.5rem; margin-top:1rem;">
+                <button class="btn btn-large" style="margin-top:0.75rem; background: var(--success);" onclick="confirmManualArrivalButton()">Conferma Arrivo</button>
+                <div style="display:flex; gap:0.5rem; margin-top:0.75rem;">
                     <button class="btn btn-secondary" style="margin-top:0;" onclick="openPaymentModeModal()">Indietro</button>
                     <button class="btn btn-secondary btn-danger" style="margin-top:0;" onclick="cancelRideProcess()">Annulla</button>
                 </div>
             `);
+        }
+
+        function confirmManualArrivalButton() {
+            let val = document.getElementById('manual-arrival').value;
+            if (!val) {
+                if (currentDetectedStreet) {
+                    val = currentDetectedStreet;
+                } else {
+                    return alert("Inserisci o geolocalizza un indirizzo di arrivo");
+                }
+            }
+            if (!val.toLowerCase().includes('milano')) {
+                val += ", Milano";
+            }
+            currentRide.arrivalAddress = val;
+            openEndTimeModal();
         }
 
         function captureArrivalGPS() {
@@ -1269,32 +1271,7 @@
                 }
                 const inputManual = document.getElementById('manual-arrival');
                 if (inputManual) inputManual.value = address;
-
-                const modalContent = modalBody.querySelector('.modal-content');
-                let okBtn = document.getElementById('gps-ok-btn-arr');
-                if (!okBtn && modalContent) {
-                    const btn = document.createElement('button');
-                    btn.id = 'gps-ok-btn-arr';
-                    btn.className = 'btn btn-large';
-                    btn.style.marginTop = '0.75rem';
-                    btn.innerText = 'Conferma Arrivo';
-                    btn.onclick = () => {
-                        currentRide.arrivalAddress = currentDetectedStreet;
-                        openEndTimeModal();
-                    };
-                    modalContent.appendChild(btn);
-                }
             });
-        }
-
-        function submitManualArrival() {
-            let val = document.getElementById('manual-arrival').value;
-            if (!val) return alert("Inserisci un indirizzo");
-            if (!val.toLowerCase().includes('milano')) {
-                val += ", Milano";
-            }
-            currentRide.arrivalAddress = val;
-            openEndTimeModal();
         }
 
         function openEndTimeModal() {
