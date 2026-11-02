@@ -506,23 +506,23 @@
             </div>
             
             <div class="card" style="border-color: var(--success);">
-                <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--success);">Medie Globali & Fasce Tariffarie</h3>
+                <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--success);">Medie Globali & Fasce Tariffarie (€/Min)</h3>
                 <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.85rem;">
                     <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
-                        <div style="font-weight: 700; color: var(--accent-primary); margin-bottom: 0.2rem;">🌐 Globale (Tutte le corse)</div>
-                        <div style="display: flex; justify-content: space-between;"><span>€/Minuto: <strong id="global-avg-min">€0.00</strong></span><span>€/KM: <strong id="global-avg-km">€0.00</strong></span></div>
+                        <div style="font-weight: 700; color: var(--accent-primary); margin-bottom: 0.2rem;">🌐 Globale (Media delle 3 fasce)</div>
+                        <div style="display: flex; justify-content: space-between;"><span>Media €/Minuto: <strong id="global-avg-min">€0.00</strong></span></div>
                     </div>
                     <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
                         <div style="font-weight: 700; color: var(--warning); margin-bottom: 0.2rem;">☀️ Giorno Feriale (Lun-Sab 06:00 - 21:00)</div>
-                        <div style="display: flex; justify-content: space-between;"><span>€/Min: <strong id="feriale-avg-min">€0.00</strong></span><span>€/KM: <strong id="feriale-avg-km">€0.00</strong></span></div>
+                        <div style="display: flex; justify-content: space-between;"><span>Media €/Min: <strong id="feriale-avg-min">€0.00</strong></span></div>
                     </div>
                     <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
                         <div style="font-weight: 700; color: #a855f7; margin-bottom: 0.2rem;">🌙 Notte (Tutti i giorni 21:00 - 06:00)</div>
-                        <div style="display: flex; justify-content: space-between;"><span>€/Min: <strong id="notte-avg-min">€0.00</strong></span><span>€/KM: <strong id="notte-avg-km">€0.00</strong></span></div>
+                        <div style="display: flex; justify-content: space-between;"><span>Media €/Min: <strong id="notte-avg-min">€0.00</strong></span></div>
                     </div>
                     <div style="background: #0f172a; padding: 0.6rem; border-radius: var(--radius-sm);">
                         <div style="font-weight: 700; color: var(--success); margin-bottom: 0.2rem;">🎉 Domenica / Festivi (06:00 - 21:00)</div>
-                        <div style="display: flex; justify-content: space-between;"><span>€/Min: <strong id="festivo-avg-min">€0.00</strong></span><span>€/KM: <strong id="festivo-avg-km">€0.00</strong></span></div>
+                        <div style="display: flex; justify-content: space-between;"><span>Media €/Min: <strong id="festivo-avg-min">€0.00</strong></span></div>
                     </div>
                 </div>
             </div>
@@ -837,7 +837,7 @@
                 detailsDiv.innerHTML = `
                     <div style="font-weight: 700; font-size: 1.1rem; color: var(--success); margin-bottom: 0.4rem;">€${last.amount ? last.amount.toFixed(2) : '0.00'}</div>
                     <div style="font-size: 0.9rem; color: var(--text-main); margin-bottom: 0.2rem;">${last.departureAddress || ''} ➔ ${last.arrivalAddress || ''}</div>
-                    <div style="font-size: 0.8rem; color: var(--accent-primary);">⏱️ Tempo: <strong>${last.estimatedMinutes || 0} min</strong> (€${last.costPerMin || 0}/min) | 🛣️ Distanza: <strong>${last.estimatedKm || 0} km</strong> (€${last.costPerKm || 0}/km)</div>
+                    <div style="font-size: 0.8rem; color: var(--accent-primary);">⏱️ Tempo: <strong>${last.estimatedMinutes || 0} min</strong> (€${last.costPerMin || 0}/min) | 🛣️ Distanza: <strong>${last.estimatedKm || 0} km</strong></div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">${last.pickupMode || ''} • ${last.paymentMode || ''}</div>
                     ${last.nearestParking ? `<div style="font-size: 0.75rem; color: var(--success); margin-top: 0.2rem;">🅿️ ${last.nearestParking}</div>` : ''}
                 `;
@@ -1329,14 +1329,12 @@
             if (distKm === 0) distKm = 4.8;
 
             let costPerMin = estMinutes > 0 ? (currentRide.amount / estMinutes).toFixed(2) : '0.00';
-            let costPerKm = distKm > 0 ? (currentRide.amount / distKm).toFixed(2) : '0.00';
 
             currentRide.id = Date.now();
             currentRide.date = getCurrentDateTime().date;
             currentRide.estimatedKm = distKm;
             currentRide.estimatedMinutes = estMinutes;
-            currentRide.costPerMin = costPerMin;
-            currentRide.costPerKm = costPerKm;
+            currentRide.costPerMin = parseFloat(costPerMin);
 
             rides.push(currentRide);
             localStorage.setItem('taxiRides', JSON.stringify(rides));
@@ -1344,6 +1342,8 @@
             currentDepCoords = null;
             currentArrCoords = null;
             closeModal();
+            
+            alert("Corsa inserita correttamente! 🚖");
             switchSection('rides');
             updatePrivacyTotalUI();
             updateLastRideUI();
@@ -1539,7 +1539,7 @@
                     <div class="ride-info">
                         <div style="font-weight: 700;">${r.startTime ? r.startTime.time : ''} - ${r.endTime ? r.endTime.time : ''}</div>
                         <div style="font-size: 0.85rem; color: var(--text-muted);">${r.departureAddress || ''} ➔ ${r.arrivalAddress || ''}</div>
-                        <div style="font-size: 0.75rem; color: var(--accent-primary);">⏱️ ${r.estimatedMinutes || 0} min (€${r.costPerMin || 0}/min) | 🛣️ ${r.estimatedKm || 0} km (€${r.costPerKm || 0}/km)</div>
+                        <div style="font-size: 0.75rem; color: var(--accent-primary);">⏱️ ${r.estimatedMinutes || 0} min (€${typeof r.costPerMin === 'number' ? r.costPerMin.toFixed(2) : (r.costPerMin || 0)}/min) | 🛣️ ${r.estimatedKm || 0} km</div>
                         <div style="font-size: 0.75rem; color: var(--text-muted);">${r.pickupMode || ''} • ${r.paymentMode || ''}</div>
                         ${r.nearestParking ? `<div style="font-size: 0.75rem; color: var(--success);">🅿️ ${r.nearestParking}</div>` : ''}
                     </div>
@@ -2232,19 +2232,13 @@
         }
 
         function calculateAverages() {
-            let totalMin = 0, totalKm = 0, totalAmt = 0;
-            let ferialeMin = 0, ferialeKm = 0, ferialeAmt = 0;
-            let notteMin = 0, notteKm = 0, notteAmt = 0;
-            let festivoMin = 0, festivoKm = 0, festivoAmt = 0;
+            let ferialeRates = [];
+            let notteRates = [];
+            let festivoRates = [];
 
             rides.forEach(r => {
-                const amt = r.amount || 0;
-                const min = r.estimatedMinutes || 0;
-                const km = r.estimatedKm || 0;
-
-                totalMin += min;
-                totalKm += km;
-                totalAmt += amt;
+                let costMin = typeof r.costPerMin === 'number' ? r.costPerMin : parseFloat(r.costPerMin || 0);
+                if (isNaN(costMin) || costMin <= 0) return;
 
                 let hour = 10;
                 if (r.startTime && r.startTime.time) {
@@ -2254,37 +2248,32 @@
                 const isFest = isHolidayOrSunday(r.date);
 
                 if (hour >= 21 || hour < 6) {
-                    notteMin += min;
-                    notteKm += km;
-                    notteAmt += amt;
+                    notteRates.push(costMin);
                 } else if (isFest) {
-                    festivoMin += min;
-                    festivoKm += km;
-                    festivoAmt += amt;
+                    festivoRates.push(costMin);
                 } else {
-                    ferialeMin += min;
-                    ferialeKm += km;
-                    ferialeAmt += amt;
+                    ferialeRates.push(costMin);
                 }
             });
 
+            const calcMean = (arr) => arr.length > 0 ? (arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+
+            const avgFeriale = calcMean(ferialeRates);
+            const avgNotte = calcMean(notteRates);
+            const avgFestivo = calcMean(festivoRates);
+
+            let activeFasce = [];
+            if (avgFeriale > 0) activeFasce.push(avgFeriale);
+            if (avgNotte > 0) activeFasce.push(avgNotte);
+            if (avgFestivo > 0) activeFasce.push(avgFestivo);
+
+            const avgGlobal = activeFasce.length > 0 ? (activeFasce.reduce((a, b) => a + b, 0) / activeFasce.length) : 0;
+
             return {
-                global: {
-                    min: totalMin > 0 ? (totalAmt / totalMin).toFixed(2) : '0.00',
-                    km: totalKm > 0 ? (totalAmt / totalKm).toFixed(2) : '0.00'
-                },
-                feriale: {
-                    min: ferialeMin > 0 ? (ferialeAmt / ferialeMin).toFixed(2) : '0.00',
-                    km: ferialeKm > 0 ? (ferialeAmt / ferialeKm).toFixed(2) : '0.00'
-                },
-                notte: {
-                    min: notteMin > 0 ? (notteAmt / notteMin).toFixed(2) : '0.00',
-                    km: notteKm > 0 ? (notteAmt / notteKm).toFixed(2) : '0.00'
-                },
-                festivo: {
-                    min: festivoMin > 0 ? (festivoAmt / festivoMin).toFixed(2) : '0.00',
-                    km: festivoKm > 0 ? (festivoAmt / festivoKm).toFixed(2) : '0.00'
-                }
+                global: avgGlobal.toFixed(2),
+                feriale: avgFeriale.toFixed(2),
+                notte: avgNotte.toFixed(2),
+                festivo: avgFestivo.toFixed(2)
             };
         }
 
@@ -2310,14 +2299,10 @@
             document.getElementById('sum-vouchers').innerText = `€${vouchers.toFixed(2)}`;
 
             const avgs = calculateAverages();
-            document.getElementById('global-avg-min').innerText = `€${avgs.global.min}`;
-            document.getElementById('global-avg-km').innerText = `€${avgs.global.km}`;
-            document.getElementById('feriale-avg-min').innerText = `€${avgs.feriale.min}`;
-            document.getElementById('feriale-avg-km').innerText = `€${avgs.feriale.km}`;
-            document.getElementById('notte-avg-min').innerText = `€${avgs.notte.min}`;
-            document.getElementById('notte-avg-km').innerText = `€${avgs.notte.km}`;
-            document.getElementById('festivo-avg-min').innerText = `€${avgs.festivo.min}`;
-            document.getElementById('festivo-avg-km').innerText = `€${avgs.festivo.km}`;
+            document.getElementById('global-avg-min').innerText = `€${avgs.global}`;
+            document.getElementById('feriale-avg-min').innerText = `€${avgs.feriale}`;
+            document.getElementById('notte-avg-min').innerText = `€${avgs.notte}`;
+            document.getElementById('festivo-avg-min').innerText = `€${avgs.festivo}`;
         }
 
         function updateStatsUI() {
