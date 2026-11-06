@@ -837,7 +837,7 @@
                 detailsDiv.innerHTML = `
                     <div style="font-weight: 700; font-size: 1.1rem; color: var(--success); margin-bottom: 0.4rem;">€${last.amount ? last.amount.toFixed(2) : '0.00'}</div>
                     <div style="font-size: 0.9rem; color: var(--text-main); margin-bottom: 0.2rem;">${last.departureAddress || ''} ➔ ${last.arrivalAddress || ''}</div>
-                    <div style="font-size: 0.8rem; color: var(--accent-primary);">⏱️ Tempo: <strong>${last.estimatedMinutes || 0} min</strong> (€${last.costPerMin || 0}/min) | 🛣️ Distanza: <strong>${last.estimatedKm || 0} km</strong></div>
+                    <div style="font-size: 0.8rem; color: var(--accent-primary);">⏱️ Tempo: <strong>${last.estimatedMinutes || 0} min</strong> (€${last.costPerMin || 0}/min)</div>
                     <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">${last.pickupMode || ''} • ${last.paymentMode || ''}</div>
                     ${last.nearestParking ? `<div style="font-size: 0.75rem; color: var(--success); margin-top: 0.2rem;">🅿️ ${last.nearestParking}</div>` : ''}
                 `;
@@ -874,7 +874,7 @@
 
         function openTimeKeypadModal(title, backFunc) {
             openModalContent(title, `
-                <input type="text" id="time-display" readonly style="font-size: 2rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-align:center; width:100%; background:#0f172a; border:1px solid var(--border-card); border-radius:var(--radius-md); padding:0.75rem;">
+                <input type="text" id="time-display" readonly style="font-size: 2rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-align:center; width:100%; background:#0f172a; border:1px solid var(--border-card); border-radius:var(--radius-md); padding:0.75rem;" onkeydown="if(event.key==='Enter') { submitTimeValue(); }">
                 <div class="keypad-grid">
                     <button class="keypad-btn" onclick="appendTime('1')">1</button>
                     <button class="keypad-btn" onclick="appendTime('2')">2</button>
@@ -940,7 +940,7 @@
                 <button class="btn btn-large" onclick="captureDepartureGPS()">Geolocalizza Posizione GPS</button>
                 <div id="gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
                 <div class="input-group" style="margin-top: 0.75rem;">
-                    <input type="text" id="manual-departure" placeholder="Digita Parcheggio o Indirizzo" oninput="handleParkingSuggestions('manual-departure', 'dep-suggestions')">
+                    <input type="text" id="manual-departure" placeholder="Digita Parcheggio o Indirizzo" oninput="handleParkingSuggestions('manual-departure', 'dep-suggestions')" onkeydown="if(event.key==='Enter') { confirmManualDepartureButton(); }">
                     <div id="dep-suggestions" class="suggestions-box" style="display:none;"></div>
                 </div>
                 <button class="btn btn-large" style="margin-top:0.75rem; background: var(--success);" onclick="confirmManualDepartureButton()">Conferma Partenza</button>
@@ -1119,7 +1119,7 @@
         function openAmountModalStep4() {
             amountBuffer = '';
             openModalContent('Importo Corsa (€)', `
-                <input type="text" id="amount-display" inputmode="decimal" placeholder="0,00" readonly style="font-size: 2rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-align:center; width:100%; background:#0f172a; border:1px solid var(--border-card); border-radius:var(--radius-md); padding:0.75rem;">
+                <input type="text" id="amount-display" inputmode="decimal" placeholder="0,00" readonly style="font-size: 2rem; font-weight: 700; color: var(--success); margin-bottom: 0.5rem; text-align:center; width:100%; background:#0f172a; border:1px solid var(--border-card); border-radius:var(--radius-md); padding:0.75rem;" onkeydown="if(event.key==='Enter') { submitRideAmount(); }">
                 <div class="keypad-grid">
                     <button class="keypad-btn" onclick="appendAmount('1')">1</button>
                     <button class="keypad-btn" onclick="appendAmount('2')">2</button>
@@ -1212,7 +1212,7 @@
         function openExtraCodeModal(title, placeholder, field) {
             openModalContent(title, `
                 <div class="input-group" style="margin-bottom:1rem;">
-                    <input type="number" id="extra-code-input" inputmode="numeric" placeholder="${placeholder}">
+                    <input type="number" id="extra-code-input" inputmode="numeric" placeholder="${placeholder}" onkeydown="if(event.key==='Enter') { submitExtraCode('${field}'); }">
                 </div>
                 <div style="display:flex; gap:0.5rem;">
                     <button class="btn btn-secondary" style="margin-top:0;" onclick="openPaymentModeModal()">Indietro</button>
@@ -1233,7 +1233,7 @@
                 <button class="btn btn-large" onclick="captureArrivalGPS()">Rileva Posizione Arrivo</button>
                 <div id="gps-result" style="display:none;" class="card" style="margin-top:0.75rem;"></div>
                 <div class="input-group" style="margin-top: 0.75rem;">
-                    <input type="text" id="manual-arrival" placeholder="Digita Parcheggio o Indirizzo Arrivo" oninput="handleParkingSuggestions('manual-arrival', 'arr-suggestions')">
+                    <input type="text" id="manual-arrival" placeholder="Digita Parcheggio o Indirizzo Arrivo" oninput="handleParkingSuggestions('manual-arrival', 'arr-suggestions')" onkeydown="if(event.key==='Enter') { confirmManualArrivalButton(); }">
                     <div id="arr-suggestions" class="suggestions-box" style="display:none;"></div>
                 </div>
                 <button class="btn btn-large" style="margin-top:0.75rem; background: var(--success);" onclick="confirmManualArrivalButton()">Conferma Arrivo</button>
@@ -1336,17 +1336,105 @@
             currentRide.estimatedMinutes = estMinutes;
             currentRide.costPerMin = parseFloat(costPerMin);
 
+            // Controllo anomalia KM / Tempo
+            // Anomalia 1: Pochi minuti (<= 3 min) ma distanza eccessiva (> 3 km) oppure 
+            // Anomalia 2: Tempo lungo (>= 30 min) ma pochissimi km (< 1.5 km) o viceversa (es. 3 km in 60 min)
+            let isAnomalous = false;
+            if ((estMinutes <= 3 && distKm > 3) || (estMinutes >= 35 && distKm < 2) || (distKm >= 3 && estMinutes >= 45)) {
+                isAnomalous = true;
+            }
+
             rides.push(currentRide);
             localStorage.setItem('taxiRides', JSON.stringify(rides));
+            
+            const savedRideId = currentRide.id;
             currentRide = {};
             currentDepCoords = null;
             currentArrCoords = null;
+
+            if (isAnomalous) {
+                openModalContent('Verifica Corsa', `
+                    <div style="text-align: center; font-size: 1.1rem; font-weight: 800; color: var(--danger); line-height: 1.5; margin-bottom: 1rem;">
+                        🚨🚨🚨 ALERT ALERT 🚨🚨🚨
+                    </div>
+                    <div style="text-align: center; font-size: 0.95krem; line-height: 1.6; margin-bottom: 1.5rem; color: var(--text-main);">
+                        Ti abbiamo beccata da un controllo! Risulta che la corsa inserita non è corretta perché sicuramente ti sei dimenticata di schiacciare qualche pulsante. Ti amiamo lo stesso moltissimo ma Gesù non vuole per cui schiaccia il pulsante modifica su questa corsa e metti i dati corretti. Un bacio e ti aspettiamo a casa 😊💪
+                    </div>
+                    <button class="btn btn-large" style="background: var(--warning); color: #000; margin-bottom: 0.5rem;" onclick="closeModalAndEdit(${savedRideId})">Modifica questa corsa</button>
+                    <button class="btn btn-secondary" onclick="closeModal(); switchSection('rides'); updatePrivacyTotalUI(); updateLastRideUI();">Chiudi e torna alla Home</button>
+                `);
+            } else {
+                closeModal();
+                alert("Corsa inserita correttamente! 🚖");
+                switchSection('rides');
+                updatePrivacyTotalUI();
+                updateLastRideUI();
+            }
+        }
+
+        function closeModalAndEdit(rideId) {
             closeModal();
-            
-            alert("Corsa inserita correttamente! 🚖");
-            switchSection('rides');
-            updatePrivacyTotalUI();
+            switchSection('history');
+            setTimeout(() => {
+                openEditRideModal(rideId);
+            }, 200);
+        }
+
+        function openEditRideModal(rideId) {
+            const r = rides.find(item => item.id === rideId);
+            if (!r) return;
+            editingRideId = rideId;
+            modalBody.innerHTML = `
+                <div class="modal-title">Modifica Corsa</div>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-muted);">Importo (€):</label>
+                        <input type="number" id="edit-ride-amount" value="${r.amount}" step="0.10">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-muted);">Partenza:</label>
+                        <input type="text" id="edit-ride-dep" value="${r.departureAddress}">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-muted);">Arrivo:</label>
+                        <input type="text" id="edit-ride-arr" value="${r.arrivalAddress}">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-muted);">Minuti stimati:</label>
+                        <input type="number" id="edit-ride-min" value="${r.estimatedMinutes}">
+                    </div>
+                    <button class="btn btn-large" onclick="saveEditedRide()">Salva Modifiche</button>
+                    <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+                </div>
+            `;
+            modalOverlay.classList.add('active');
+        }
+
+        function saveEditedRide() {
+            const newAmt = parseFloat(document.getElementById('edit-ride-amount').value);
+            const newDep = document.getElementById('edit-ride-dep').value;
+            const newArr = document.getElementById('edit-ride-arr').value;
+            const newMin = parseInt(document.getElementById('edit-ride-min').value, 10);
+
+            if (isNaN(newAmt) || isNaN(newMin)) return alert("Inserisci valori numerici validi");
+
+            rides = rides.map(r => {
+                if (r.id === editingRideId) {
+                    r.amount = newAmt;
+                    r.departureAddress = newDep;
+                    r.arrivalAddress = newArr;
+                    r.estimatedMinutes = newMin;
+                    r.costPerMin = newMin > 0 ? parseFloat((newAmt / newMin).toFixed(2)) : 0;
+                }
+                return r;
+            });
+
+            localStorage.setItem('taxiRides', JSON.stringify(rides));
+            closeModal();
+            updateRidesList();
             updateLastRideUI();
+            updatePrivacyTotalUI();
+            alert("Corsa modificata con successo!");
         }
 
         function toggleInvertRates() {
@@ -1383,7 +1471,7 @@
             modalBody.innerHTML = `
                 <div class="modal-title">Aggiungi / Aggiorna Parcheggio Taxi</div>
                 <div class="input-group" style="margin-bottom:0.75rem;">
-                    <input type="text" id="new-parking-name" placeholder="Nome Parcheggio (Seleziona o Scrivi)" oninput="handleParkingSuggestions('new-parking-name', 'p-add-sug')">
+                    <input type="text" id="new-parking-name" placeholder="Nome Parcheggio (Seleziona o Scrivi)" oninput="handleParkingInputWithCheck('new-parking-name', 'p-add-sug')">
                     <div id="p-add-sug" class="suggestions-box" style="display:none;"></div>
                 </div>
                 <button class="btn btn-large" onclick="captureParkingGPS()">Geolocalizza Posizione GPS</button>
@@ -1391,6 +1479,34 @@
                 <button class="btn btn-secondary" style="margin-top:1rem;" onclick="closeModal()">Chiudi</button>
             `;
             modalOverlay.classList.add('active');
+        }
+
+        function handleParkingInputWithCheck(inputId, sugId) {
+            const inputVal = document.getElementById(inputId).value.toLowerCase().trim();
+            const sugBox = document.getElementById(sugId);
+
+            if (!inputVal) {
+                sugBox.style.display = 'none';
+                return;
+            }
+
+            // Verifica se è già stato inserito nei parcheggi utente con GPS o salvati
+            const alreadyExists = userParkings.some(p => p.name.toLowerCase() === inputVal);
+            if (alreadyExists) {
+                sugBox.style.display = 'block';
+                sugBox.innerHTML = `<div class="suggestion-item" style="color: var(--warning); font-weight:700; text-align:center;">⚠️ Già inserito</div>`;
+                return;
+            }
+
+            const matches = masterTaxiParkingsMilano.filter(p => p.toLowerCase().includes(inputVal));
+            if (matches.length > 0) {
+                sugBox.style.display = 'block';
+                sugBox.innerHTML = matches.slice(0, 5).map(m => `
+                    <div class="suggestion-item" onclick="selectParkingSuggestion('${m}', '${inputId}', '${sugId}')">🅿️ ${m}</div>
+                `).join('');
+            } else {
+                sugBox.style.display = 'none';
+            }
         }
 
         let tempParkingCoords = null;
@@ -1539,12 +1655,13 @@
                     <div class="ride-info">
                         <div style="font-weight: 700;">${r.startTime ? r.startTime.time : ''} - ${r.endTime ? r.endTime.time : ''}</div>
                         <div style="font-size: 0.85rem; color: var(--text-muted);">${r.departureAddress || ''} ➔ ${r.arrivalAddress || ''}</div>
-                        <div style="font-size: 0.75rem; color: var(--accent-primary);">⏱️ ${r.estimatedMinutes || 0} min (€${typeof r.costPerMin === 'number' ? r.costPerMin.toFixed(2) : (r.costPerMin || 0)}/min) | 🛣️ ${r.estimatedKm || 0} km</div>
+                        <div style="font-size: 0.75rem; color: var(--accent-primary);">⏱️ ${r.estimatedMinutes || 0} min (€${typeof r.costPerMin === 'number' ? r.costPerMin.toFixed(2) : (r.costPerMin || 0)}/min)</div>
                         <div style="font-size: 0.75rem; color: var(--text-muted);">${r.pickupMode || ''} • ${r.paymentMode || ''}</div>
                         ${r.nearestParking ? `<div style="font-size: 0.75rem; color: var(--success);">🅿️ ${r.nearestParking}</div>` : ''}
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.4rem;">
                         <div class="ride-amount">€${r.amount ? r.amount.toFixed(2) : '0.00'}</div>
+                        <button class="edit-btn" onclick="openEditRideModal(${r.id})">Modifica</button>
                         <button class="delete-btn" onclick="deleteRide(${r.id})">X</button>
                     </div>
                 `;
@@ -1652,7 +1769,7 @@
                     <div class="modal-title">Inizio Servizio (KM)</div>
                     <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; text-align: center;">KM Chiusura Turno Precedente: <strong>${lastKm} km</strong></div>
                     <div class="input-group" style="margin-bottom: 1rem;">
-                        <input type="number" id="start-km-input" placeholder="KM Partenza" inputmode="numeric">
+                        <input type="number" id="start-km-input" placeholder="KM Partenza" inputmode="numeric" onkeydown="if(event.key==='Enter') { startServiceSubmit(${lastKm}); }">
                     </div>
                     <button class="btn btn-large" onclick="startServiceSubmit(${lastKm})">Inizia Turno</button>
                     <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="closeModal()">Annulla</button>
@@ -1662,7 +1779,7 @@
                     <div class="modal-title">Fine Servizio (KM)</div>
                     <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem; text-align: center;">KM Inizio Turno: <strong>${activeShift.startKm} km</strong></div>
                     <div class="input-group" style="margin-bottom: 1rem;">
-                        <input type="number" id="end-km-input" placeholder="KM Arrivo" inputmode="numeric">
+                        <input type="number" id="end-km-input" placeholder="KM Arrivo" inputmode="numeric" onkeydown="if(event.key==='Enter') { endServiceSubmit(${activeShift.startKm}); }">
                     </div>
                     <button class="btn btn-large btn-danger" onclick="endServiceSubmit(${activeShift.startKm})">Termina Turno</button>
                     <button class="btn btn-secondary" style="margin-top:0.5rem;" onclick="closeModal()">Annulla</button>
@@ -2337,4 +2454,4 @@
         }
     </script>
 </body>
-</html>
+    </html>
