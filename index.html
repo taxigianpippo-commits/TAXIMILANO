@@ -1035,7 +1035,7 @@
             return nearest;
         }
 
-        function fetchRealGPS(callback) {
+        function captureDepartureGPS() {
             const gpsResultDiv = document.getElementById('gps-result');
             if (gpsResultDiv) {
                 gpsResultDiv.style.display = 'block';
@@ -1043,7 +1043,7 @@
             }
 
             if (!navigator.geolocation) {
-                callback("Milano Centro", {lat: 45.4641, lon: 9.1919}, null);
+                alert("Il tuo browser non supporta la geolocalizzazione.");
                 return;
             }
 
@@ -1051,49 +1051,33 @@
                 position => {
                     const lat = position.coords.latitude;
                     const lon = position.coords.longitude;
-                    const coords = { lat, lon };
+                    currentDepCoords = { lat, lon };
                     const nearestParking = findNearestTaxiParking(lat, lon);
-                    
-                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`)
-                        .then(response => response.json())
-                        .then(data => {
-                            let via = "";
-                            let city = "Milano";
-                            if (data && data.address) {
-                                via = data.address.road || data.address.pedestrian || data.address.street || data.address.suburb || "";
-                                city = data.address.city || data.address.town || data.address.village || "Milano";
-                            }
-                            if (!via && data && data.display_name) {
-                                via = data.display_name.split(',')[0];
-                            }
-                            via = via.replace(/[0-9]/g, '').trim() || "Milano Centro";
-                            let fullAddress = `${via}, ${city}`;
-                            callback(fullAddress, coords, nearestParking);
-                        })
-                        .catch(() => callback("Milano Centro, Milano", coords, nearestParking));
-                },
-                () => callback("Milano Centro, Milano", {lat: 45.4641, lon: 9.1919}, null),
-                { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-            );
-        }
+                    currentRide.nearestParking = nearestParking;
 
-        function captureDepartureGPS() {
-            fetchRealGPS((address, coords, nearestParking) => {
-                currentDetectedStreet = address;
-                currentDepCoords = coords;
-                currentRide.nearestParking = nearestParking;
-                const gpsResultDiv = document.getElementById('gps-result');
-                if (gpsResultDiv) {
-                    gpsResultDiv.style.display = 'block';
-                    gpsResultDiv.innerHTML = `
-                        <div style="font-size: 0.8rem; color: var(--text-muted);">Indirizzo rilevato:</div>
-                        <div style="font-size: 1rem; font-weight:700; margin-top:0.2rem;">${address}</div>
-                        ${nearestParking ? `<div style="font-size: 0.8rem; color: var(--success); margin-top:0.2rem;">🅿️ Vicino a: <strong>${nearestParking}</strong></div>` : ''}
-                    `;
-                }
-                const inputManual = document.getElementById('manual-departure');
-                if (inputManual) inputManual.value = address;
-            });
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            let via = data.address.road || data.address.pedestrian || data.address.street || data.address.suburb || "Milano Centro";
+                            via = via.replace(/[0-9]/g, '').trim();
+                            currentDetectedStreet = `${via}, Milano`;
+                            if (gpsResultDiv) {
+                                gpsResultDiv.innerHTML = `Partenza: <strong>${currentDetectedStreet}</strong> ${nearestParking ? '<br>🅿️ Parcheggio: ' + nearestParking : ''}`;
+                            }
+                            const manualInput = document.getElementById('manual-departure');
+                            if (manualInput) manualInput.value = currentDetectedStreet;
+                        })
+                        .catch(() => {
+                            currentDetectedStreet = "Milano Centro";
+                            if (gpsResultDiv) gpsResultDiv.innerHTML = "Partenza: <strong>Milano Centro</strong>";
+                        });
+                },
+                () => {
+                    alert("Impossibile rilevare la posizione GPS.");
+                    if (gpsResultDiv) gpsResultDiv.style.display = 'none';
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
         }
 
         function openPickupModeModal() {
@@ -1261,17 +1245,46 @@
         }
 
         function captureArrivalGPS() {
-            fetchRealGPS((address, coords) => {
-                currentDetectedStreet = address;
-                currentArrCoords = coords;
-                const gpsResultDiv = document.getElementById('gps-result');
-                if (gpsResultDiv) {
-                    gpsResultDiv.style.display = 'block';
-                    gpsResultDiv.innerHTML = `<div style="font-size:0.8rem; color:var(--text-muted);">Arrivo:</div><div style="font-size:1rem; font-weight:700;">${address}</div>`;
-                }
-                const inputManual = document.getElementById('manual-arrival');
-                if (inputManual) inputManual.value = address;
-            });
+            const gpsResultDiv = document.getElementById('gps-result');
+            if (gpsResultDiv) {
+                gpsResultDiv.style.display = 'block';
+                gpsResultDiv.innerHTML = '<span style="color:var(--text-muted);">Rilevamento GPS in corso...</span>';
+            }
+
+            if (!navigator.geolocation) {
+                alert("Il tuo browser non supporta la geolocalizzazione.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                position => {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+                    currentArrCoords = { lat, lon };
+
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            let via = data.address.road || data.address.pedestrian || data.address.street || data.address.suburb || "Milano Centro";
+                            via = via.replace(/[0-9]/g, '').trim();
+                            currentDetectedStreet = `${via}, Milano`;
+                            if (gpsResultDiv) {
+                                gpsResultDiv.innerHTML = `Arrivo: <strong>${currentDetectedStreet}</strong>`;
+                            }
+                            const manualInput = document.getElementById('manual-arrival');
+                            if (manualInput) manualInput.value = currentDetectedStreet;
+                        })
+                        .catch(() => {
+                            currentDetectedStreet = "Milano Centro";
+                            if (gpsResultDiv) gpsResultDiv.innerHTML = "Arrivo: <strong>Milano Centro</strong>";
+                        });
+                },
+                () => {
+                    alert("Impossibile rilevare la posizione GPS.");
+                    if (gpsResultDiv) gpsResultDiv.style.display = 'none';
+                },
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
         }
 
         function openEndTimeModal() {
@@ -1336,9 +1349,6 @@
             currentRide.estimatedMinutes = estMinutes;
             currentRide.costPerMin = parseFloat(costPerMin);
 
-            // Controllo anomalia KM / Tempo
-            // Anomalia 1: Pochi minuti (<= 3 min) ma distanza eccessiva (> 3 km) oppure 
-            // Anomalia 2: Tempo lungo (>= 30 min) ma pochissimi km (< 1.5 km) o viceversa (es. 3 km in 60 min)
             let isAnomalous = false;
             if ((estMinutes <= 3 && distKm > 3) || (estMinutes >= 35 && distKm < 2) || (distKm >= 3 && estMinutes >= 45)) {
                 isAnomalous = true;
@@ -1352,12 +1362,20 @@
             currentDepCoords = null;
             currentArrCoords = null;
 
+            // RISCONTRO SONORO AGGIUNTO QUI AL COMPLETAMENTO DELLA CORSA
+            if ('speechSynthesis' in window) {
+                const utterance = new SpeechSynthesisUtterance("Corsa completata");
+                utterance.lang = 'it-IT';
+                utterance.rate = 1.1;
+                window.speechSynthesis.speak(utterance);
+            }
+
             if (isAnomalous) {
                 openModalContent('Verifica Corsa', `
                     <div style="text-align: center; font-size: 1.1rem; font-weight: 800; color: var(--danger); line-height: 1.5; margin-bottom: 1rem;">
                         🚨🚨🚨 ALERT ALERT 🚨🚨🚨
                     </div>
-                    <div style="text-align: center; font-size: 0.95krem; line-height: 1.6; margin-bottom: 1.5rem; color: var(--text-main);">
+                    <div style="text-align: center; font-size: 0.95rem; line-height: 1.6; margin-bottom: 1.5rem; color: var(--text-main);">
                         Ti abbiamo beccata da un controllo! Risulta che la corsa inserita non è corretta perché sicuramente ti sei dimenticata di schiacciare qualche pulsante. Ti amiamo lo stesso moltissimo ma Gesù non vuole per cui schiaccia il pulsante modifica su questa corsa e metti i dati corretti. Un bacio e ti aspettiamo a casa 😊💪
                     </div>
                     <button class="btn btn-large" style="background: var(--warning); color: #000; margin-bottom: 0.5rem;" onclick="closeModalAndEdit(${savedRideId})">Modifica questa corsa</button>
@@ -1490,7 +1508,6 @@
                 return;
             }
 
-            // Verifica se è già stato inserito nei parcheggi utente con GPS o salvati
             const alreadyExists = userParkings.some(p => p.name.toLowerCase() === inputVal);
             if (alreadyExists) {
                 sugBox.style.display = 'block';
@@ -1529,7 +1546,7 @@
                     saveNewParkingWithName(name, tempParkingCoords);
                 },
                 () => alert("Impossibile rilevare la posizione GPS"),
-                { enableHighAccuracy: true, timeout: 8000 }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
 
@@ -2454,4 +2471,4 @@
         }
     </script>
 </body>
-    </html>
+</html>
