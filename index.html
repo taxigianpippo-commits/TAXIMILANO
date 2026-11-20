@@ -614,6 +614,15 @@
                 </div>
             </div>
 
+            <div class="card" style="border-color: var(--success);">
+                <h3 style="font-size: 0.95rem; margin-bottom: 0.5rem; text-align: center; color: var(--success);">Chiusura Anno al 31/12 (+180.000 KM)</h3>
+                <div style="font-size: 0.8rem; color: var(--text-muted); text-align: center; margin-bottom: 0.75rem;">
+                    A fine turno (o ultimo turno utile dell'anno) somma 180.000 km ai KM inseriti.
+                </div>
+                <button class="btn btn-secondary" style="margin-top:0; margin-bottom:0.75rem;" onclick="openYearEndKmModal()">📅 Registra / Aggiorna 31/12</button>
+                <div id="year-end-km-list" class="rides-list"></div>
+            </div>
+
             <div class="card">
                 <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; text-align: center; color: var(--warning);">Storico Turni & Modifica KM</h3>
                 <div id="shifts-list" class="rides-list" style="margin-bottom: 1rem;"></div>
@@ -726,6 +735,7 @@
         let rides = JSON.parse(localStorage.getItem('taxiRides')) || [];
         let expenses = JSON.parse(localStorage.getItem('taxiExpenses')) || [];
         let shifts = JSON.parse(localStorage.getItem('taxiShifts')) || [];
+        let yearEndKms = JSON.parse(localStorage.getItem('taxiYearEndKms')) || [];
         let userParkings = JSON.parse(localStorage.getItem('taxiUserParkings')) || [];
         let maints = JSON.parse(localStorage.getItem('taxiMaints')) || [
             { id: 1, name: "Tagliando Motore", intervalKm: 15000, lastKm: 0 },
@@ -750,6 +760,34 @@
             });
             history.pushState(null, '', window.location.href);
         });
+
+        function playRideCompletionSound() {
+            try {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance("Corsa completata");
+                    utterance.lang = 'it-IT';
+                    utterance.rate = 1.1;
+                    window.speechSynthesis.speak(utterance);
+                }
+            } catch (e) {}
+
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) {
+                    const ctx = new AudioCtx();
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(880, ctx.currentTime);
+                    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.25);
+                }
+            } catch (e) {}
+        }
 
         function switchSection(sectionId) {
             document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -951,6 +989,27 @@
             `);
         }
 
+        function formatAddressWithMunicipality(rawVal) {
+            const trimmed = (rawVal || '').trim();
+            if (!trimmed) return '';
+            if (trimmed.includes(',')) {
+                return trimmed;
+            }
+            return `${trimmed}, Milano`;
+        }
+
+        function extractMunicipalityFromAddress(addressObj, displayName) {
+            if (addressObj) {
+                const mun = addressObj.city || addressObj.town || addressObj.village || addressObj.municipality || addressObj.county;
+                if (mun) return mun.trim();
+            }
+            if (displayName) {
+                const parts = displayName.split(',').map(p => p.trim());
+                if (parts.length >= 2) return parts[1];
+            }
+            return "Milano";
+        }
+
         function confirmManualDepartureButton() {
             let val = document.getElementById('manual-departure').value;
             if (!val) {
@@ -960,10 +1019,7 @@
                     return alert("Inserisci o geolocalizza un indirizzo");
                 }
             }
-            if (!val.toLowerCase().includes('milano')) {
-                val += ", Milano";
-            }
-            currentRide.departureAddress = val;
+            currentRide.departureAddress = formatAddressWithMunicipality(val);
             if (!currentRide.nearestParking) currentRide.nearestParking = "Manuale";
             openPickupModeModal();
         }
@@ -1001,19 +1057,20 @@
         }
 
         function geocodeAddressAndProceed(address, type) {
-            let fullSearch = address.toLowerCase().includes('milano') ? address : `${address}, Milano, Italia`;
+            let fullSearch = formatAddressWithMunicipality(address) + ", Italia";
             fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullSearch)}`)
                 .then(res => res.json())
                 .then(data => {
                     if (data && data.length > 0) {
                         let coords = { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+                        const formattedAddr = formatAddressWithMunicipality(address);
                         if (type === 'dep') {
                             currentDepCoords = coords;
-                            currentRide.departureAddress = address;
-                            currentRide.nearestParking = address;
+                            currentRide.departureAddress = formattedAddr;
+                            currentRide.nearestParking = formattedAddr;
                         } else {
                             currentArrCoords = coords;
-                            currentRide.arrivalAddress = address;
+                            currentRide.arrivalAddress = formattedAddr;
                         }
                     }
                 })
@@ -1055,12 +1112,14 @@
                     const nearestParking = findNearestTaxiParking(lat, lon);
                     currentRide.nearestParking = nearestParking;
 
-                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`)
                         .then(res => res.json())
                         .then(data => {
-                            let via = data.address.road || data.address.pedestrian || data.address.street || data.address.suburb || "Milano Centro";
+                            const addrObj = data && data.address ? data.address : {};
+                            let via = addrObj.road || addrObj.pedestrian || addrObj.street || addrObj.suburb || "Centro";
                             via = via.replace(/[0-9]/g, '').trim();
-                            currentDetectedStreet = `${via}, Milano`;
+                            const municipality = extractMunicipalityFromAddress(addrObj, data ? data.display_name : '');
+                            currentDetectedStreet = `${via}, ${municipality}`;
                             if (gpsResultDiv) {
                                 gpsResultDiv.innerHTML = `Partenza: <strong>${currentDetectedStreet}</strong> ${nearestParking ? '<br>🅿️ Parcheggio: ' + nearestParking : ''}`;
                             }
@@ -1068,8 +1127,8 @@
                             if (manualInput) manualInput.value = currentDetectedStreet;
                         })
                         .catch(() => {
-                            currentDetectedStreet = "Milano Centro";
-                            if (gpsResultDiv) gpsResultDiv.innerHTML = "Partenza: <strong>Milano Centro</strong>";
+                            currentDetectedStreet = "Centro, Milano";
+                            if (gpsResultDiv) gpsResultDiv.innerHTML = "Partenza: <strong>Centro, Milano</strong>";
                         });
                 },
                 () => {
@@ -1237,10 +1296,7 @@
                     return alert("Inserisci o geolocalizza un indirizzo di arrivo");
                 }
             }
-            if (!val.toLowerCase().includes('milano')) {
-                val += ", Milano";
-            }
-            currentRide.arrivalAddress = val;
+            currentRide.arrivalAddress = formatAddressWithMunicipality(val);
             openEndTimeModal();
         }
 
@@ -1262,12 +1318,14 @@
                     const lon = position.coords.longitude;
                     currentArrCoords = { lat, lon };
 
-                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`)
                         .then(res => res.json())
                         .then(data => {
-                            let via = data.address.road || data.address.pedestrian || data.address.street || data.address.suburb || "Milano Centro";
+                            const addrObj = data && data.address ? data.address : {};
+                            let via = addrObj.road || addrObj.pedestrian || addrObj.street || addrObj.suburb || "Centro";
                             via = via.replace(/[0-9]/g, '').trim();
-                            currentDetectedStreet = `${via}, Milano`;
+                            const municipality = extractMunicipalityFromAddress(addrObj, data ? data.display_name : '');
+                            currentDetectedStreet = `${via}, ${municipality}`;
                             if (gpsResultDiv) {
                                 gpsResultDiv.innerHTML = `Arrivo: <strong>${currentDetectedStreet}</strong>`;
                             }
@@ -1275,8 +1333,8 @@
                             if (manualInput) manualInput.value = currentDetectedStreet;
                         })
                         .catch(() => {
-                            currentDetectedStreet = "Milano Centro";
-                            if (gpsResultDiv) gpsResultDiv.innerHTML = "Arrivo: <strong>Milano Centro</strong>";
+                            currentDetectedStreet = "Centro, Milano";
+                            if (gpsResultDiv) gpsResultDiv.innerHTML = "Arrivo: <strong>Centro, Milano</strong>";
                         });
                 },
                 () => {
@@ -1362,13 +1420,7 @@
             currentDepCoords = null;
             currentArrCoords = null;
 
-            // RISCONTRO SONORO AGGIUNTO QUI AL COMPLETAMENTO DELLA CORSA
-            if ('speechSynthesis' in window) {
-                const utterance = new SpeechSynthesisUtterance("Corsa completata");
-                utterance.lang = 'it-IT';
-                utterance.rate = 1.1;
-                window.speechSynthesis.speak(utterance);
-            }
+            playRideCompletionSound();
 
             if (isAnomalous) {
                 openModalContent('Verifica Corsa', `
@@ -1814,6 +1866,58 @@
             updateServiceUI();
         }
 
+        function syncYearEndKmWithShift(endKm, dateStr) {
+            const year = parseInt(dateStr.split('-')[0], 10);
+            const totalWithBase = endKm + 180000;
+            const idx = yearEndKms.findIndex(item => item.year === year);
+            const entry = {
+                year,
+                date: dateStr,
+                enteredKm: endKm,
+                totalKm3112: totalWithBase
+            };
+            if (idx !== -1) {
+                yearEndKms[idx] = entry;
+            } else {
+                yearEndKms.push(entry);
+            }
+            yearEndKms.sort((a, b) => a.year - b.year);
+            localStorage.setItem('taxiYearEndKms', JSON.stringify(yearEndKms));
+        }
+
+        function openYearEndKmModal() {
+            const nowYear = new Date().getFullYear();
+            const existing = yearEndKms.find(y => y.year === nowYear);
+            const defaultEntered = existing ? existing.enteredKm : '';
+
+            modalBody.innerHTML = `
+                <div class="modal-title">Totale KM al 31/12 (+180.000)</div>
+                <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-muted);">Anno di riferimento:</label>
+                        <input type="number" id="yearend-year" value="${nowYear}" inputmode="numeric">
+                    </div>
+                    <div>
+                        <label style="font-size:0.75rem; color:var(--text-muted);">KM inseriti a fine turno / ultimo turno utile:</label>
+                        <input type="number" id="yearend-km" value="${defaultEntered}" placeholder="Es. 8995" inputmode="numeric">
+                    </div>
+                    <button class="btn btn-large" onclick="saveYearEndKm()">Salva Totale 31/12</button>
+                    <button class="btn btn-secondary" onclick="closeModal()">Annulla</button>
+                </div>
+            `;
+            modalOverlay.classList.add('active');
+        }
+
+        function saveYearEndKm() {
+            const year = parseInt(document.getElementById('yearend-year').value, 10);
+            const km = parseInt(document.getElementById('yearend-km').value, 10);
+            if (isNaN(year) || isNaN(km)) return alert("Inserisci anno e KM validi");
+            syncYearEndKmWithShift(km, `${year}-12-31`);
+            closeModal();
+            updateKmPageUI();
+            alert(`Salvato per il 31/12/${year}: ${(km + 180000).toLocaleString('it-IT')} km`);
+        }
+
         function endServiceSubmit(startKm) {
             const km = parseInt(document.getElementById('end-km-input').value, 10);
             if (isNaN(km)) return alert("Inserisci i KM validi");
@@ -1821,6 +1925,7 @@
                 return alert("I KM di arrivo non possono essere inferiori a quelli di partenza del turno!");
             }
             const driven = km - startKm;
+            const todayStr = getCurrentDateTime().date;
             shifts = shifts.map(s => {
                 if (!s.endTime) {
                     s.endKm = km;
@@ -1830,6 +1935,7 @@
                 return s;
             });
             localStorage.setItem('taxiShifts', JSON.stringify(shifts));
+            syncYearEndKmWithShift(km, todayStr);
             
             maints.forEach(m => { m.lastKm += driven; });
             localStorage.setItem('taxiMaints', JSON.stringify(maints));
@@ -1861,6 +1967,27 @@
         function updateKmPageUI() {
             const totalDriven = shifts.reduce((sum, s) => sum + (s.drivenKm || 0), 0);
             document.getElementById('total-km-driven').innerText = `${totalDriven} km`;
+
+            const yearContainer = document.getElementById('year-end-km-list');
+            if (yearContainer) {
+                yearContainer.innerHTML = '';
+                if (yearEndKms.length === 0) {
+                    yearContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--text-muted); text-align:center;">Nessun dato 31/12 registrato.</div>';
+                } else {
+                    yearEndKms.slice().reverse().forEach(y => {
+                        const div = document.createElement('div');
+                        div.className = 'ride-item';
+                        div.innerHTML = `
+                            <div class="ride-info">
+                                <div style="font-weight:700;">31/12/${y.year}</div>
+                                <div style="font-size:0.75rem; color:var(--text-muted);">Inseriti: ${y.enteredKm.toLocaleString('it-IT')} km + 180.000 km</div>
+                            </div>
+                            <div class="ride-amount" style="font-size:1.05rem;">${y.totalKm3112.toLocaleString('it-IT')} km</div>
+                        `;
+                        yearContainer.appendChild(div);
+                    });
+                }
+            }
 
             const shiftsContainer = document.getElementById('shifts-list');
             shiftsContainer.innerHTML = '';
@@ -1980,15 +2107,18 @@
             if (isNaN(newStart) || isNaN(newEnd)) return alert("Inserisci valori numerici validi");
             if (newEnd < newStart) return alert("I KM di arrivo non possono essere inferiori a quelli di partenza!");
 
+            let targetDate = getCurrentDateTime().date;
             shifts = shifts.map(s => {
                 if (s.id === editingShiftId) {
                     s.startKm = newStart;
                     s.endKm = newEnd;
                     s.drivenKm = newEnd - newStart;
+                    targetDate = s.startDate || targetDate;
                 }
                 return s;
             });
             localStorage.setItem('taxiShifts', JSON.stringify(shifts));
+            syncYearEndKmWithShift(newEnd, targetDate);
             closeModal();
             updateKmPageUI();
             updateServiceUI();
@@ -2117,6 +2247,10 @@
             return `${day} ${month} '${yearSuffix}`;
         }
 
+        function formatEuroStr(val) {
+            return `€ ${(Number(val) || 0).toFixed(2)}`;
+        }
+
         function executeExcelExport() {
             const fromDate = document.getElementById('export-from').value;
             const toDate = document.getElementById('export-to').value;
@@ -2128,7 +2262,6 @@
             const allDates = Array.from(new Set([...filteredRides.map(r => r.date), ...filteredExpenses.map(e => e.date)])).sort();
             const cardTypes = ['Nexi', 'Bancomat', 'Amex'];
             const voucherTypes = ['App', 'Importo in Centrale', 'Assegno', 'Globix', 'Samarcanda'];
-            const yearSuffixAll = allDates.length > 0 ? `'` + String(new Date(allDates[0]).getFullYear()).slice(-2) : `'26`;
 
             const ridesSheetData = [];
             allDates.forEach(dateStr => {
@@ -2143,48 +2276,56 @@
                 dayRides.forEach((r, index) => {
                     ridesSheetData.push({
                         "Data": index === 0 ? formattedDate : '',
-                        "Anno": yearSuffixAll,
                         "Partenza": r.startTime ? r.startTime.time : '',
                         "Arrivo": r.endTime ? r.endTime.time : '',
                         "Via Partenza": r.departureAddress,
                         "Via Arrivo": r.arrivalAddress,
-                        "Importo": r.amount ? r.amount.toFixed(2) : '0.00',
+                        "Importo": formatEuroStr(r.amount || 0),
                         "Tipo di Pagamento": r.paymentMode,
                         "Presa": r.pickupMode || '',
                         "🅿️": r.nearestParking || '',
-                        "Benzina": index === 0 && benzina > 0 ? benzina.toFixed(2) : '',
-                        "Caselli": index === 0 && caselli > 0 ? caselli.toFixed(2) : '',
+                        "Benzina": index === 0 && benzina > 0 ? formatEuroStr(benzina) : '',
+                        "Caselli": index === 0 && caselli > 0 ? formatEuroStr(caselli) : '',
                         "Manutenzione": index === 0 && manutenzioni.length ? manutenzioni.map(m => m.description).join(', ') : '',
-                        "Importo Manutenzione": index === 0 && manutenzioni.length ? manutenzioni.reduce((sum, m) => sum + m.amount, 0).toFixed(2) : ''
+                        "Importo Manutenzione": index === 0 && manutenzioni.length ? formatEuroStr(manutenzioni.reduce((sum, m) => sum + m.amount, 0)) : ''
                     });
                 });
             });
 
-            const cardsSheetData = allDates.map(dateStr => {
+            const cardRowsRaw = allDates.map(dateStr => {
                 const dayRides = filteredRides.filter(r => r.date === dateStr && cardTypes.includes(r.paymentSubtype));
                 return {
-                    "Data": formatDateExcel(dateStr),
-                    "Anno": yearSuffixAll,
-                    "Totale Carte": dayRides.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Nexi": dayRides.filter(r => r.paymentSubtype === 'Nexi').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Bancomat": dayRides.filter(r => r.paymentSubtype === 'Bancomat').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Amex": dayRides.filter(r => r.paymentSubtype === 'Amex').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)
+                    dateStr,
+                    totCarte: dayRides.reduce((sum, r) => sum + (r.amount || 0), 0),
+                    nexi: dayRides.filter(r => r.paymentSubtype === 'Nexi').reduce((sum, r) => sum + (r.amount || 0), 0),
+                    bancomat: dayRides.filter(r => r.paymentSubtype === 'Bancomat').reduce((sum, r) => sum + (r.amount || 0), 0),
+                    amex: dayRides.filter(r => r.paymentSubtype === 'Amex').reduce((sum, r) => sum + (r.amount || 0), 0)
                 };
-            }).filter(day => day["Totale Carte"] > 0);
+            }).filter(day => day.totCarte > 0);
 
-            const vouchersSheetData = allDates.map(dateStr => {
-                const dayRides = filteredRides.filter(r => r.date === dateStr && voucherTypes.includes(r.paymentSubtype));
-                return {
-                    "Data": formatDateExcel(dateStr),
-                    "Anno": yearSuffixAll,
-                    "Totale Buoni": dayRides.reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "App": dayRides.filter(r => r.paymentSubtype === 'App').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Importo in Centrale": dayRides.filter(r => r.paymentSubtype === 'Importo in Centrale').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Assegno": dayRides.filter(r => r.paymentSubtype === 'Assegno').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Globix": dayRides.filter(r => r.paymentSubtype === 'Globix').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2),
-                    "Samarcanda": dayRides.filter(r => r.paymentSubtype === 'Samarcanda').reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)
-                };
-            }).filter(day => day["Totale Buoni"] > 0);
+            const monthCardsTotal = cardRowsRaw.reduce((sum, d) => sum + d.totCarte, 0);
+            const cardsSheetData = cardRowsRaw.map((day, idx) => ({
+                "Data": formatDateExcel(day.dateStr),
+                "Totale Carte": formatEuroStr(day.totCarte),
+                "Nexi": formatEuroStr(day.nexi),
+                "Bancomat": formatEuroStr(day.bancomat),
+                "Amex": formatEuroStr(day.amex),
+                "": "",
+                "Totale del mese": idx === 0 ? formatEuroStr(monthCardsTotal) : ""
+            }));
+
+            const selectedVoucherRides = filteredRides.filter(r => voucherTypes.includes(r.paymentSubtype));
+            const monthVouchersTotal = selectedVoucherRides.reduce((sum, r) => sum + (r.amount || 0), 0);
+            const vouchersSheetData = selectedVoucherRides.map((r, idx) => ({
+                "Data": formatDateExcel(r.date),
+                "Importo": formatEuroStr(r.amount || 0),
+                "Via Partenza": r.departureAddress || '',
+                "Via Arrivo": r.arrivalAddress || '',
+                "Tipologia di Pagamento": r.paymentSubtype || r.paymentMode || '',
+                "": "",
+                "Numero di corsa o numero di ordine": r.rideNumber || r.voucherNumber || '',
+                "Totale del mese": idx === 0 ? formatEuroStr(monthVouchersTotal) : ""
+            }));
 
             const totalsSheetData = allDates.map(dateStr => {
                 const dayRides = filteredRides.filter(r => r.date === dateStr);
@@ -2192,29 +2333,30 @@
                 const cash = dayRides.filter(r => r.paymentSubtype === 'Contanti').reduce((sum, r) => sum + (r.amount || 0), 0);
                 const cards = dayRides.filter(r => cardTypes.includes(r.paymentSubtype)).reduce((sum, r) => sum + (r.amount || 0), 0);
                 const vouchers = dayRides.filter(r => voucherTypes.includes(r.paymentSubtype)).reduce((sum, r) => sum + (r.amount || 0), 0);
-                const settanta = total * 0.70;
+                const colD = cards;
+                const colE = vouchers;
+                const colF = colD + colE;
+                const colG = total * 0.70;
 
                 return {
                     "Data": formatDateExcel(dateStr),
-                    "Anno": yearSuffixAll,
-                    "Totale Giorno": total.toFixed(2),
-                    "Contanti": cash.toFixed(2),
-                    "Carte": cards.toFixed(2),
-                    "Buoni / App": vouchers.toFixed(2),
-                    "Colonna G (70%)": settanta.toFixed(2),
-                    "tracciato": (cash + cards).toFixed(2)
+                    "Totale Giorno": formatEuroStr(total),
+                    "Contanti": formatEuroStr(cash),
+                    "Carte": formatEuroStr(colD),
+                    "Buoni / App": formatEuroStr(colE),
+                    "Somma Col. D+E": formatEuroStr(colF),
+                    "70% Col. B": formatEuroStr(colG),
+                    "CORRISPETTIVI": ""
                 };
             });
 
-            const corrSheetData = allDates.map(dateStr => {
-                const dayRides = filteredRides.filter(r => r.date === dateStr);
-                const total = dayRides.reduce((sum, r) => sum + (r.amount || 0), 0);
-                const settanta = total * 0.70;
-                return {
-                    "Data": formatDateExcel(dateStr),
-                    "Corrispettivi (70%)": settanta.toFixed(2),
-                    "Anno": yearSuffixAll
-                };
+            const corrSheetData = allDates.map(dateStr => ({
+                "Data": formatDateExcel(dateStr),
+                "Corrispettivi": formatEuroStr(0)
+            }));
+            corrSheetData.push({
+                "Data": "Totale del mese",
+                "Corrispettivi": formatEuroStr(0)
             });
 
             const wb = XLSX.utils.book_new();
@@ -2228,7 +2370,7 @@
         }
 
         function backupData() {
-            const blob = new Blob([JSON.stringify({ rides, expenses, shifts, maints, userParkings })], { type: 'application/json' });
+            const blob = new Blob([JSON.stringify({ rides, expenses, shifts, yearEndKms, maints, userParkings })], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -2249,11 +2391,13 @@
                 rides = data.rides || [];
                 expenses = data.expenses || [];
                 shifts = data.shifts || [];
+                yearEndKms = data.yearEndKms || [];
                 maints = data.maints || maints;
                 userParkings = data.userParkings || [];
                 localStorage.setItem('taxiRides', JSON.stringify(rides));
                 localStorage.setItem('taxiExpenses', JSON.stringify(expenses));
                 localStorage.setItem('taxiShifts', JSON.stringify(shifts));
+                localStorage.setItem('taxiYearEndKms', JSON.stringify(yearEndKms));
                 localStorage.setItem('taxiMaints', JSON.stringify(maints));
                 localStorage.setItem('taxiUserParkings', JSON.stringify(userParkings));
                 location.reload();
@@ -2471,4 +2615,4 @@
         }
     </script>
 </body>
-</html>
+    </html>
